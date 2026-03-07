@@ -42,7 +42,7 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   // Public paths that don't require auth
-  const publicPaths = ['/login', '/register', '/magic-link', '/auth/callback']
+  const publicPaths = ['/login', '/register', '/magic-link', '/reset-password', '/update-password', '/auth/callback']
   const isPublicPath = publicPaths.some((path) =>
     request.nextUrl.pathname.startsWith(path)
   )
@@ -54,7 +54,8 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  if (user && isPublicPath) {
+  const isUpdatePassword = request.nextUrl.pathname.startsWith('/update-password')
+  if (user && isPublicPath && !isUpdatePassword) {
     const url = request.nextUrl.clone()
     url.pathname = '/'
     return NextResponse.redirect(url)

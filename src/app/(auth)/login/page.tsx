@@ -37,7 +37,10 @@ export default function LoginPage() {
       })
 
       if (error) {
-        setError(error.message)
+        const msg = error.message === 'Invalid login credentials'
+          ? 'Email ou senha incorretos.'
+          : error.message
+        setError(msg)
         return
       }
 
@@ -121,6 +124,11 @@ export default function LoginPage() {
           </div>
         </CardContent>
         <CardFooter className="flex flex-col space-y-3">
+          <div className="flex justify-end">
+            <Link href="/reset-password" className="text-xs text-primary hover:underline">
+              Esqueci minha senha
+            </Link>
+          </div>
           <Button
             type="submit"
             className="w-full"
