@@ -1,6 +1,6 @@
 'use client'
 
-import { useReducer, useRef, useState, useCallback, useEffect } from 'react'
+import { Suspense, useReducer, useRef, useState, useCallback, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Loader2,
@@ -135,7 +135,15 @@ function orgNameToBrand(orgName: string): Brand | null {
   return null
 }
 
-export default function NewLandingPagePage() {
+export default function NewLandingPagePageWrapper() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="text-muted-foreground">Carregando...</div></div>}>
+      <NewLandingPagePage />
+    </Suspense>
+  )
+}
+
+function NewLandingPagePage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { currentOrg } = useOrganizationContext()
