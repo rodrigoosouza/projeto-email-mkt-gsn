@@ -6,9 +6,11 @@ import { Button } from '@/components/ui/button'
 import { useLeads } from '@/hooks/use-leads'
 import { LeadsFilters } from '@/components/leads/leads-filters'
 import { LeadsTable } from '@/components/leads/leads-table'
-import { deleteLeads } from '@/lib/supabase/leads'
+import { deleteLeads, deleteAllLeads } from '@/lib/supabase/leads'
+import { useOrganizationContext } from '@/contexts/organization-context'
 
 export default function LeadsPage() {
+  const { currentOrg } = useOrganizationContext()
   const {
     leads,
     loading,
@@ -25,6 +27,12 @@ export default function LeadsPage() {
 
   async function handleDeleteMany(ids: string[]) {
     await deleteLeads(ids)
+    refetch()
+  }
+
+  async function handleDeleteAll() {
+    if (!currentOrg) return
+    await deleteAllLeads(currentOrg.id)
     refetch()
   }
 
@@ -62,6 +70,7 @@ export default function LeadsPage() {
         totalPages={totalPages}
         onPageChange={setPage}
         onDeleteMany={handleDeleteMany}
+        onDeleteAll={handleDeleteAll}
       />
     </div>
   )

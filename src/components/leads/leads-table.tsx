@@ -42,6 +42,7 @@ interface LeadsTableProps {
   totalPages: number
   onPageChange: (page: number) => void
   onDeleteMany?: (ids: string[]) => Promise<void>
+  onDeleteAll?: () => Promise<void>
 }
 
 function ScoreBar({ score }: { score: number }) {
@@ -102,10 +103,12 @@ export function LeadsTable({
   totalPages,
   onPageChange,
   onDeleteMany,
+  onDeleteAll,
 }: LeadsTableProps) {
   const router = useRouter()
   const { toast } = useToast()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [selectAllMode, setSelectAllMode] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
   const from = (page - 1) * pageSize + 1
@@ -131,6 +134,21 @@ export function LeadsTable({
   }
 
   async function handleDeleteSelected() {
+    if (selectAllMode && onDeleteAll) {
+      setDeleting(true)
+      try {
+        await onDeleteAll()
+        toast({ title: `Todos os ${total} leads excluidos` })
+        setSelectedIds(new Set())
+        setSelectAllMode(false)
+      } catch {
+        toast({ title: 'Erro ao excluir leads', variant: 'destructive' })
+      } finally {
+        setDeleting(false)
+      }
+      return
+    }
+
     if (!onDeleteMany || selectedIds.size === 0) return
     setDeleting(true)
     try {
@@ -143,6 +161,8 @@ export function LeadsTable({
       setDeleting(false)
     }
   }
+
+  const displayCount = selectAllMode ? total : selectedIds.size
 
   if (!loading && leads.length === 0) {
     return (
@@ -163,33 +183,59 @@ export function LeadsTable({
     <div className="space-y-4">
       {/* Bulk actions bar */}
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 p-3 bg-muted/50 border rounded-lg">
-          <span className="text-sm font-medium">{selectedIds.size} selecionado(s)</span>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" size="sm" disabled={deleting}>
-                {deleting ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Trash2 className="mr-2 h-3.5 w-3.5" />}
-                Excluir
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Excluir {selectedIds.size} lead(s)?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Esta acao nao pode ser desfeita. Os leads selecionados serao permanentemente excluidos.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDeleteSelected} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                  Excluir {selectedIds.size} lead(s)
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-          <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
-            Limpar selecao
-          </Button>
+        <div className="flex flex-col gap-2 p-3 bg-muted/50 border rounded-lg">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium">{displayCount} selecionado(s)</span>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm" disabled={deleting}>
+                  {deleting ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Trash2 className="mr-2 h-3.5 w-3.5" />}
+                  Excluir {selectAllMode ? 'Todos' : 'Selecionados'}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Excluir {displayCount} lead(s)?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta acao nao pode ser desfeita. {selectAllMode ? 'Todos os leads serao' : 'Os leads selecionados serao'} permanentemente excluidos.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDeleteSelected} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    Excluir {displayCount} lead(s)
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            <Button variant="ghost" size="sm" onClick={() => { setSelectedIds(new Set()); setSelectAllMode(false) }}>
+              Limpar selecao
+            </Button>
+          </div>
+          {allSelected && total > pageSize && !selectAllMode && (
+            <p className="text-sm text-muted-foreground">
+              Todos os {leads.length} leads desta pagina estao selecionados.{' '}
+              <button
+                type="button"
+                className="text-primary hover:underline font-medium"
+                onClick={() => setSelectAllMode(true)}
+              >
+                Selecionar todos os {total} leads
+              </button>
+            </p>
+          )}
+          {selectAllMode && (
+            <p className="text-sm text-primary font-medium">
+              Todos os {total} leads estao selecionados.{' '}
+              <button
+                type="button"
+                className="text-muted-foreground hover:underline font-normal"
+                onClick={() => setSelectAllMode(false)}
+              >
+                Selecionar apenas esta pagina
+              </button>
+            </p>
+          )}
         </div>
       )}
 

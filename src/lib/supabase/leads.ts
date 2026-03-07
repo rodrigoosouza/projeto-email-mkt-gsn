@@ -146,6 +146,12 @@ export async function deleteLeads(ids: string[]): Promise<void> {
   if (error) throw error
 }
 
+export async function deleteAllLeads(orgId: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase.from('leads').delete().eq('org_id', orgId)
+  if (error) throw error
+}
+
 export async function bulkCreateLeads(
   orgId: string,
   leads: CreateLeadPayload[]
