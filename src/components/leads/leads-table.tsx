@@ -1,0 +1,229 @@
+'use client'
+
+import { useRouter } from 'next/navigation'
+import { formatDistanceToNow } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
+import { Users, ChevronLeft, ChevronRight } from 'lucide-react'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Skeleton } from '@/components/ui/skeleton'
+import { EmptyState } from '@/components/shared/empty-state'
+import { LEAD_STATUS_LABELS, LEAD_STATUS_COLORS } from '@/lib/constants'
+import type { LeadWithTags } from '@/hooks/use-leads'
+
+interface LeadsTableProps {
+  leads: LeadWithTags[]
+  loading: boolean
+  page: number
+  pageSize: number
+  total: number
+  totalPages: number
+  onPageChange: (page: number) => void
+}
+
+function ScoreBar({ score }: { score: number }) {
+  const color =
+    score >= 70 ? 'bg-green-500' : score >= 40 ? 'bg-yellow-500' : 'bg-gray-300'
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="w-16 h-2 rounded-full bg-muted overflow-hidden">
+        <div
+          className={`h-full rounded-full ${color}`}
+          style={{ width: `${Math.min(100, Math.max(0, score))}%` }}
+        />
+      </div>
+      <span className="text-xs text-muted-foreground">{score}</span>
+    </div>
+  )
+}
+
+function TableSkeleton() {
+  return (
+    <>
+      {Array.from({ length: 5 }).map((_, i) => (
+        <TableRow key={i}>
+          <TableCell>
+            <Skeleton className="h-4 w-4" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-4 w-32" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-4 w-40" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-5 w-16 rounded-full" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-2 w-16" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-5 w-20 rounded-full" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-4 w-24" />
+          </TableCell>
+        </TableRow>
+      ))}
+    </>
+  )
+}
+
+export function LeadsTable({
+  leads,
+  loading,
+  page,
+  pageSize,
+  total,
+  totalPages,
+  onPageChange,
+}: LeadsTableProps) {
+  const router = useRouter()
+
+  const from = (page - 1) * pageSize + 1
+  const to = Math.min(page * pageSize, total)
+
+  if (!loading && leads.length === 0) {
+    return (
+      <div className="rounded-md border">
+        <EmptyState
+          icon={Users}
+          title="Nenhum lead encontrado"
+          description="Adicione leads manualmente ou importe um arquivo CSV."
+          action={
+            <Button onClick={() => router.push('/leads/new')}>Adicionar Lead</Button>
+          }
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[40px]">
+                <Checkbox disabled />
+              </TableHead>
+              <TableHead>Nome</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Score</TableHead>
+              <TableHead>Tags</TableHead>
+              <TableHead>Criado em</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableSkeleton />
+            ) : (
+              leads.map((lead) => {
+                const fullName = [lead.first_name, lead.last_name]
+                  .filter(Boolean)
+                  .join(' ')
+                const statusLabel = LEAD_STATUS_LABELS[lead.status] || lead.status
+                const statusColor = LEAD_STATUS_COLORS[lead.status] || ''
+                const tags = lead.lead_tag_assignments?.map((a) => a.tag).filter(Boolean) || []
+
+                return (
+                  <TableRow
+                    key={lead.id}
+                    className="cursor-pointer"
+                    onClick={() => router.push(`/leads/${lead.id}`)}
+                  >
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Checkbox />
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {fullName || <span className="text-muted-foreground">-</span>}
+                    </TableCell>
+                    <TableCell>{lead.email}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className={statusColor}>
+                        {statusLabel}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <ScoreBar score={lead.score} />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {tags.length > 0 ? (
+                          tags.map((tag) => (
+                            <Badge
+                              key={tag.id}
+                              variant="outline"
+                              style={{
+                                borderColor: tag.color,
+                                color: tag.color,
+                                backgroundColor: `${tag.color}15`,
+                              }}
+                            >
+                              {tag.name}
+                            </Badge>
+                          ))
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {formatDistanceToNow(new Date(lead.created_at), {
+                        addSuffix: true,
+                        locale: ptBR,
+                      })}
+                    </TableCell>
+                  </TableRow>
+                )
+              })
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Pagination */}
+      {total > 0 && (
+        <div className="flex items-center justify-between px-2">
+          <p className="text-sm text-muted-foreground">
+            Mostrando {from} a {to} de {total} leads
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page <= 1}
+              onClick={() => onPageChange(page - 1)}
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Anterior
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              {page} de {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page >= totalPages}
+              onClick={() => onPageChange(page + 1)}
+            >
+              Proximo
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
