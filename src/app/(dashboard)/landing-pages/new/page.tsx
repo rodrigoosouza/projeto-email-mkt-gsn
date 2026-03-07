@@ -405,6 +405,18 @@ function NewLandingPagePage() {
 
       if (data.html) {
         dispatch({ type: 'SET_HTML', html: data.html })
+
+        // Persist HTML to database
+        if (lpId) {
+          const supabase = createClient()
+          await supabase
+            .from('landing_pages')
+            .update({
+              html_content: data.html,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', lpId)
+        }
       }
     } catch (err) {
       console.error('Erro no chat:', err)
