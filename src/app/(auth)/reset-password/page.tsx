@@ -33,7 +33,10 @@ export default function ResetPasswordPage() {
       })
 
       if (error) {
-        setError(error.message)
+        const msg = error.message === 'email rate limit exceeded'
+          ? 'Limite de envios atingido. Aguarde alguns minutos e tente novamente.'
+          : error.message
+        setError(msg)
         return
       }
 
