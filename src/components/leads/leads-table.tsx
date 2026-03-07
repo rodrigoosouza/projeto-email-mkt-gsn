@@ -1,9 +1,10 @@
 'use client'
 
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { Users, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Users, ChevronLeft, ChevronRight, Trash2, Loader2 } from 'lucide-react'
 import {
   Table,
   TableBody,
@@ -16,6 +17,18 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
+import { useToast } from '@/components/ui/use-toast'
 import { EmptyState } from '@/components/shared/empty-state'
 import { LEAD_STATUS_LABELS, LEAD_STATUS_COLORS } from '@/lib/constants'
 import type { LeadWithTags } from '@/hooks/use-leads'
@@ -28,6 +41,7 @@ interface LeadsTableProps {
   total: number
   totalPages: number
   onPageChange: (page: number) => void
+  onDeleteMany?: (ids: string[]) => Promise<void>
 }
 
 function ScoreBar({ score }: { score: number }) {
@@ -87,11 +101,48 @@ export function LeadsTable({
   total,
   totalPages,
   onPageChange,
+  onDeleteMany,
 }: LeadsTableProps) {
   const router = useRouter()
+  const { toast } = useToast()
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [deleting, setDeleting] = useState(false)
 
   const from = (page - 1) * pageSize + 1
   const to = Math.min(page * pageSize, total)
+
+  const allSelected = leads.length > 0 && leads.every((l) => selectedIds.has(l.id))
+
+  function toggleSelectAll() {
+    if (allSelected) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(leads.map((l) => l.id)))
+    }
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  async function handleDeleteSelected() {
+    if (!onDeleteMany || selectedIds.size === 0) return
+    setDeleting(true)
+    try {
+      await onDeleteMany(Array.from(selectedIds))
+      toast({ title: `${selectedIds.size} lead(s) excluido(s)` })
+      setSelectedIds(new Set())
+    } catch {
+      toast({ title: 'Erro ao excluir leads', variant: 'destructive' })
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   if (!loading && leads.length === 0) {
     return (
@@ -110,12 +161,44 @@ export function LeadsTable({
 
   return (
     <div className="space-y-4">
+      {/* Bulk actions bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 p-3 bg-muted/50 border rounded-lg">
+          <span className="text-sm font-medium">{selectedIds.size} selecionado(s)</span>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="sm" disabled={deleting}>
+                {deleting ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Trash2 className="mr-2 h-3.5 w-3.5" />}
+                Excluir
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Excluir {selectedIds.size} lead(s)?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta acao nao pode ser desfeita. Os leads selecionados serao permanentemente excluidos.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteSelected} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  Excluir {selectedIds.size} lead(s)
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
+            Limpar selecao
+          </Button>
+        </div>
+      )}
+
       <div className="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="w-[40px]">
-                <Checkbox disabled />
+                <Checkbox checked={allSelected} onCheckedChange={toggleSelectAll} />
               </TableHead>
               <TableHead>Nome</TableHead>
               <TableHead>Email</TableHead>
@@ -144,7 +227,10 @@ export function LeadsTable({
                     onClick={() => router.push(`/leads/${lead.id}`)}
                   >
                     <TableCell onClick={(e) => e.stopPropagation()}>
-                      <Checkbox />
+                      <Checkbox
+                        checked={selectedIds.has(lead.id)}
+                        onCheckedChange={() => toggleSelect(lead.id)}
+                      />
                     </TableCell>
                     <TableCell className="font-medium">
                       {fullName || <span className="text-muted-foreground">-</span>}

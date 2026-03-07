@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, Loader2, Plus, X, Hash, Calendar, Send } from 'lucide-react'
 import { format } from 'date-fns'
@@ -31,7 +31,15 @@ import {
 } from '@/lib/supabase/social'
 import type { SocialAccount } from '@/lib/types'
 
-export default function NewSocialPostPage() {
+export default function NewSocialPostPageWrapper() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-24"><div className="text-muted-foreground">Carregando...</div></div>}>
+      <NewSocialPostPage />
+    </Suspense>
+  )
+}
+
+function NewSocialPostPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const editId = searchParams.get('edit')

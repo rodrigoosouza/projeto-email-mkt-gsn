@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { useLeads } from '@/hooks/use-leads'
 import { LeadsFilters } from '@/components/leads/leads-filters'
 import { LeadsTable } from '@/components/leads/leads-table'
+import { deleteLeads } from '@/lib/supabase/leads'
 
 export default function LeadsPage() {
   const {
@@ -19,7 +20,13 @@ export default function LeadsPage() {
     filters,
     setFilters,
     clearFilters,
+    refetch,
   } = useLeads()
+
+  async function handleDeleteMany(ids: string[]) {
+    await deleteLeads(ids)
+    refetch()
+  }
 
   return (
     <div className="space-y-6">
@@ -54,6 +61,7 @@ export default function LeadsPage() {
         total={total}
         totalPages={totalPages}
         onPageChange={setPage}
+        onDeleteMany={handleDeleteMany}
       />
     </div>
   )

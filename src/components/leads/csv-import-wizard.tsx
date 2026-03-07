@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Upload, FileText, CheckCircle, AlertCircle, ArrowLeft, ArrowRight } from 'lucide-react'
+import { Upload, FileText, CheckCircle, AlertCircle, ArrowLeft, ArrowRight, Loader2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -165,14 +165,32 @@ export function CsvImportWizard() {
     return mapCsvRows(parsed.rows, parsed.headers, columnMapping)
   }
 
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0 })
+
   const handleImport = async () => {
     if (!currentOrg || !parsed) return
 
     setImporting(true)
     try {
       const leads = getMappedLeads()
-      const importResult = await bulkCreateLeads(currentOrg.id, leads)
-      setResult(importResult)
+      setImportProgress({ current: 0, total: leads.length })
+
+      // Import in batches of 50 with progress tracking
+      const BATCH_SIZE = 50
+      let created = 0
+      let skipped = 0
+      const errors: string[] = []
+
+      for (let i = 0; i < leads.length; i += BATCH_SIZE) {
+        const batch = leads.slice(i, i + BATCH_SIZE)
+        const batchResult = await bulkCreateLeads(currentOrg.id, batch)
+        created += batchResult.created
+        skipped += batchResult.skipped
+        errors.push(...batchResult.errors)
+        setImportProgress({ current: Math.min(i + BATCH_SIZE, leads.length), total: leads.length })
+      }
+
+      setResult({ created, skipped, errors })
       setStep('result')
     } catch (error) {
       console.error('Erro ao importar leads:', error)
@@ -458,11 +476,25 @@ export function CsvImportWizard() {
           </Button>
 
           {step === 'preview' ? (
-            <Button onClick={handleImport} disabled={importing}>
-              {importing
-                ? 'Importando...'
-                : `Importar ${getMappedLeads().length} leads`}
-            </Button>
+            <div className="flex items-center gap-3">
+              {importing && importProgress.total > 0 && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>{importProgress.current} / {importProgress.total}</span>
+                  <div className="w-24 h-2 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all"
+                      style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+              <Button onClick={handleImport} disabled={importing}>
+                {importing
+                  ? `Importando ${importProgress.current}/${importProgress.total}...`
+                  : `Importar ${getMappedLeads().length} leads`}
+              </Button>
+            </div>
           ) : (
             <Button onClick={goNext} disabled={!canGoNext()}>
               Proximo

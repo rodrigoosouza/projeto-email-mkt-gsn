@@ -140,6 +140,12 @@ export async function deleteLead(id: string): Promise<void> {
   if (error) throw error
 }
 
+export async function deleteLeads(ids: string[]): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase.from('leads').delete().in('id', ids)
+  if (error) throw error
+}
+
 export async function bulkCreateLeads(
   orgId: string,
   leads: CreateLeadPayload[]
