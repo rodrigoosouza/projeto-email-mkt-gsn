@@ -28,6 +28,7 @@ import {
   Plus,
   X,
   ClipboardList,
+  Video,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -74,6 +75,7 @@ const navigation = [
   { name: 'SEO', href: '/seo', icon: Search },
   { name: 'Redes Sociais', href: '/social', icon: AtSign },
   { name: 'Link da Bio', href: '/bio', icon: LinkIcon },
+  { name: 'Videos', href: '/videos', icon: Video },
   { name: 'Configuracoes', href: '/settings', icon: Settings },
 ]
 
