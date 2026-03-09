@@ -33,7 +33,7 @@ export async function POST(request: Request) {
 
     // Generate image with Nano Banana 2
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-2.0-flash-exp-image-generation',
       contents: [{
         role: 'user',
         parts: [{ text: imagePrompt }],
@@ -109,6 +109,11 @@ export async function POST(request: Request) {
     })
   } catch (err) {
     console.error('Generate image error:', err)
-    return NextResponse.json({ error: 'Erro ao gerar imagem' }, { status: 500 })
+    const message = err instanceof Error ? err.message : 'Erro ao gerar imagem'
+    // Check for quota/rate limit errors
+    if (message.includes('quota') || message.includes('rate')) {
+      return NextResponse.json({ error: 'Limite de quota da API atingido. Aguarde alguns minutos.' }, { status: 429 })
+    }
+    return NextResponse.json({ error: message.substring(0, 200) }, { status: 500 })
   }
 }
