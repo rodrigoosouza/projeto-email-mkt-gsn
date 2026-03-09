@@ -156,6 +156,27 @@
 
 ---
 
+## Fase 6 — Vídeos / Ad Director
+**Objetivo:** Automatizar criação de vídeos para anúncios (roteiro → cenas → imagens → vídeos).
+
+### Entregas
+
+- [x] Migration 021: tabelas video_projects + video_scenes com RLS
+- [x] API generate-scenes (OpenRouter, claude-sonnet-4, 8-12 cenas)
+- [x] Tela de listagem, criação e review de projetos
+- [x] Aprovação/reprovação individual e em massa
+- [x] Prompts otimizados para Veo 3 e Nano Banana 2
+- [x] Sidebar atualizado com link Videos
+- [ ] Integração Nano Banana 2 (Google Gemini API) — geração automática de imagens
+- [ ] Integração Veo 3.1 (Google Gemini API) — geração automática de vídeos
+- [ ] Preview de imagens/vídeos na tela de review
+- [ ] Status intermediários (generating_image, generating_video)
+- [ ] Supabase Realtime para atualizar UI durante geração
+- [ ] Supabase Storage para assets gerados
+- [ ] Trigger automático: gerar cenas → gerar imagens → gerar vídeos
+
+---
+
 ## Itens pendentes (melhorias futuras)
 
 | Item | Fase Original | Complexidade |

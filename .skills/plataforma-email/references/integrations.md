@@ -155,6 +155,58 @@ A plataforma dispara workflows via webhook e armazena o `workflow_id` na tabela 
 
 ---
 
+## Google Gemini API (Nano Banana + Veo 3)
+
+**Propósito:** Geração automática de imagens e vídeos para anúncios.
+**Docs:** https://ai.google.dev/gemini-api/docs/image-generation | https://ai.google.dev/gemini-api/docs/video
+**Auth:** `GOOGLE_GEMINI_API_KEY` (obter em Google AI Studio)
+
+### Nano Banana 2 (Imagens)
+
+| Modelo | ID | Uso |
+|--------|-----|-----|
+| Nano Banana 2 | `gemini-3.1-flash-image` | Geração rápida, custo menor |
+| Nano Banana Pro | `gemini-3-pro-image-preview` | Melhor qualidade |
+
+- Resoluções: 512px até 4K
+- Suporte a texto em imagens (múltiplos idiomas)
+- Consistência de personagens (até 5 pessoas)
+- Custo: ~$0.08/imagem (1K)
+
+### Veo 3.1 (Vídeos)
+
+| Modelo | ID | Uso |
+|--------|-----|-----|
+| Veo 3.1 (GA) | `veo-3.1-generate-001` | Produção |
+| Veo 3.1 (Preview) | `veo-3.1-generate-preview` | Testes |
+
+- Vídeos de até 8s em 720p/1080p/4K
+- Suporte a imagem de referência (asset)
+- Áudio nativo gerado automaticamente
+- Geração assíncrona (polling ~2-5 min)
+- Custo: ~$0.75/segundo (~$6 por vídeo de 8s)
+- Formato: 9:16 (vertical) para anúncios
+
+### Alternativa: fal.ai
+
+| Modelo | ID fal.ai | Custo |
+|--------|-----------|-------|
+| Nano Banana 2 | `fal-ai/nano-banana-2` | $0.08/img |
+| Nano Banana Pro | `fal-ai/nano-banana-pro` | Maior |
+
+Auth: `FAL_KEY` env var. API mais simples, retorna URL direta da imagem.
+
+### Integração na Plataforma
+
+Pipeline automatizado no módulo de Vídeos:
+1. Cena aprovada → dispara geração de imagem (Nano Banana)
+2. Imagem pronta → dispara geração de vídeo (Veo 3.1) com imagem como referência
+3. Assets salvos no Supabase Storage, URLs em `image_urls` e `video_urls` da cena
+
+Documentação completa: `.skills/plataforma-email/references/video-module.md`
+
+---
+
 ## GTM → Supabase (Existente)
 
 Já existe um fluxo configurado enviando eventos do GTM para o Supabase.

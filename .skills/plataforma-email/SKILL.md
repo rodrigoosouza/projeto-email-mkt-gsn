@@ -57,7 +57,12 @@ A plataforma replica a estrutura do RD Station em 5 áreas principais:
 - **Automação de Marketing** → Engine visual (n8n por trás)
 - **Chatbot** → Fluxos conversacionais
 
-### 5. Analisar
+### 5. Vídeos (Ad Director)
+- **Pipeline de Vídeos** → Roteiro → Cenas IA → Imagens (Nano Banana) → Vídeos (Veo 3)
+- **Review** → Aprovação/reprovação de cenas com preview de assets
+- **Automação total** → Cole o roteiro, receba os vídeos prontos
+
+### 6. Analisar
 - **Análise de Canais** → Performance por fonte de tráfego
 - **Marketing e Vendas** → Funil completo com taxas de conversão
 - **Análise de Anúncios** → Dados Meta Ads + Google Ads via API
@@ -171,6 +176,7 @@ Documentação aprofundada por área (todas prontas para implementação):
 | [file-structure.md](references/file-structure.md) | Estrutura exata de arquivos + package.json + env vars | Content + Creative |
 | [phase-1-spec.md](references/phase-1-spec.md) | 6 sprints detalhados com critérios de aceite | Todos |
 | [openclaw-agents.md](references/openclaw-agents.md) | Papéis, fluxo de trabalho, regras de operação | Head |
+| [video-module.md](references/video-module.md) | Pipeline de vídeos: Nano Banana + Veo 3 + aprovação | Growth + Content |
 
 ## Decisões Técnicas Registradas
 
@@ -187,6 +193,8 @@ Documentação aprofundada por área (todas prontas para implementação):
 | 2026-03-05 | Reaproveitar sistema de LP | Chat IA para geração de emails + preview iframe + contextos de marca. Fase 5 usa LP builder inteiro |
 | 2026-03-05 | Payload de lead das LPs como contrato da API | Formato do webhook do briefing LP = formato do POST /api/webhooks/leads |
 | 2026-03-05 | Reaproveitar patterns do OpenClaw | Multi-agent orchestration para Fase 3, memory pipeline para lead intelligence, MCP tools pattern, offline conversion pipeline para Fase 2 |
+| 2026-03-09 | Google Gemini API para vídeos | Nano Banana 2 (imagens) + Veo 3.1 (vídeos) via mesma API key. Pipeline: roteiro → cenas IA → imagens → vídeos |
+| 2026-03-09 | OpenRouter para gerar cenas | claude-sonnet-4 analisa roteiro e gera 8-12 cenas com prompts otimizados |
 
 ## Convenções do Projeto
 
