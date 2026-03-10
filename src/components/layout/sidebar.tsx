@@ -58,29 +58,90 @@ import { useOrganizationContext } from '@/contexts/organization-context'
 import { useAuth } from '@/hooks/use-auth'
 import { createOrganization } from '@/lib/supabase/organizations'
 
-const navigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Marketing', href: '/marketing', icon: ClipboardList },
-  { name: 'Calendario', href: '/content-calendar', icon: CalendarDays },
-  { name: 'Leads', href: '/leads', icon: Users },
-  { name: 'Segmentos', href: '/segments', icon: Filter },
-  { name: 'Templates', href: '/templates', icon: FileText },
-  { name: 'Campanhas', href: '/campaigns', icon: Send },
-  { name: 'Analytics', href: '/analytics', icon: BarChart3 },
-  { name: 'Automacoes', href: '/automations', icon: Zap },
-  { name: 'WhatsApp', href: '/whatsapp', icon: MessageCircle },
-  { name: 'Fluxos', href: '/whatsapp/flows', icon: Workflow },
-  { name: 'SMS', href: '/sms', icon: Smartphone },
-  { name: 'Formularios', href: '/forms', icon: FileInput },
-  { name: 'Chatbot', href: '/chatbot', icon: Bot },
-  { name: 'Tracking', href: '/tracking', icon: Activity },
-  { name: 'Landing Pages', href: '/landing-pages', icon: Globe },
-  { name: 'Publicos', href: '/audience-exports', icon: Share2 },
-  { name: 'SEO', href: '/seo', icon: Search },
-  { name: 'Redes Sociais', href: '/social', icon: AtSign },
-  { name: 'Link da Bio', href: '/bio', icon: LinkIcon },
-  { name: 'Videos', href: '/videos', icon: Video },
-  { name: 'Configuracoes', href: '/settings', icon: Settings },
+interface NavItem {
+  name: string
+  href: string
+  icon: React.ElementType
+}
+
+interface NavGroup {
+  label: string
+  items: NavItem[]
+}
+
+const navigationGroups: NavGroup[] = [
+  {
+    label: '',
+    items: [
+      { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+    ],
+  },
+  {
+    label: 'Marketing',
+    items: [
+      { name: 'Estrategia', href: '/marketing', icon: ClipboardList },
+      { name: 'Calendario', href: '/content-calendar', icon: CalendarDays },
+    ],
+  },
+  {
+    label: 'Leads & Segmentos',
+    items: [
+      { name: 'Leads', href: '/leads', icon: Users },
+      { name: 'Segmentos', href: '/segments', icon: Filter },
+      { name: 'Formularios', href: '/forms', icon: FileInput },
+    ],
+  },
+  {
+    label: 'Email Marketing',
+    items: [
+      { name: 'Campanhas', href: '/campaigns', icon: Send },
+      { name: 'Templates', href: '/templates', icon: FileText },
+      { name: 'Automacoes', href: '/automations', icon: Zap },
+      { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+    ],
+  },
+  {
+    label: 'Mensageria',
+    items: [
+      { name: 'WhatsApp', href: '/whatsapp', icon: MessageCircle },
+      { name: 'Fluxos', href: '/whatsapp/flows', icon: Workflow },
+      { name: 'SMS', href: '/sms', icon: Smartphone },
+      { name: 'Chatbot', href: '/chatbot', icon: Bot },
+    ],
+  },
+  {
+    label: 'Redes Sociais',
+    items: [
+      { name: 'Posts', href: '/social', icon: AtSign },
+      { name: 'Link da Bio', href: '/bio', icon: LinkIcon },
+    ],
+  },
+  {
+    label: 'Criativos',
+    items: [
+      { name: 'Videos', href: '/videos', icon: Video },
+    ],
+  },
+  {
+    label: 'Web',
+    items: [
+      { name: 'Landing Pages', href: '/landing-pages', icon: Globe },
+      { name: 'SEO', href: '/seo', icon: Search },
+      { name: 'Tracking', href: '/tracking', icon: Activity },
+    ],
+  },
+  {
+    label: 'Exportacoes',
+    items: [
+      { name: 'Publicos', href: '/audience-exports', icon: Share2 },
+    ],
+  },
+  {
+    label: '',
+    items: [
+      { name: 'Configuracoes', href: '/settings', icon: Settings },
+    ],
+  },
 ]
 
 interface SidebarProps {
@@ -204,30 +265,39 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
         {/* Navigation Links */}
         <ScrollArea className="flex-1 px-3 py-4">
-          <nav className="flex flex-col gap-1">
-            {navigation.map((item) => {
-              const isActive =
-                item.href === '/'
-                  ? pathname === '/'
-                  : pathname.startsWith(item.href)
+          <nav className="flex flex-col gap-0.5">
+            {navigationGroups.map((group, gi) => (
+              <div key={gi} className={group.label ? 'mt-4 first:mt-0' : ''}>
+                {group.label && (
+                  <span className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+                    {group.label}
+                  </span>
+                )}
+                {group.items.map((item) => {
+                  const isActive =
+                    item.href === '/'
+                      ? pathname === '/'
+                      : pathname.startsWith(item.href)
 
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={onClose}
-                  className={cn(
-                    'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                    isActive
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                  )}
-                >
-                  <item.icon className="h-4 w-4" />
-                  {item.name}
-                </Link>
-              )
-            })}
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={onClose}
+                      className={cn(
+                        'flex items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                        isActive
+                          ? 'bg-primary/10 text-primary'
+                          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                      )}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      {item.name}
+                    </Link>
+                  )
+                })}
+              </div>
+            ))}
           </nav>
         </ScrollArea>
 
