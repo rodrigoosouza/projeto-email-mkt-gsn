@@ -4,6 +4,100 @@ Registro de todas as implementacoes do projeto, organizado por sprint.
 
 ---
 
+## Plano de Evolucao — Fases 7-10 (2026-03-09)
+
+### Fase 7 — LP Deploy Independente
+- Nova funcao `deployToVercelGeneric()` que aceita qualquer org (nao depende mais das 3 brands hardcoded)
+- Suporte a custom domain alias via Vercel Deployments API
+- Novo endpoint `/api/landing-pages/deploy` org-aware (aceita `org_id`, `html`, `titulo`, `custom_domain`)
+- Deploy antigo (`/api/lp-builder/deploy`) continua funcionando para retrocompatibilidade
+
+### Fase 8 — Integracoes UX (Teste Real de Credenciais)
+- Novo endpoint `/api/integrations/test` que valida credenciais em tempo real
+- **6 providers com chamada live:**
+  - MailerSend: GET `/v1/domains` (Bearer token)
+  - WhatsApp: GET Facebook Graph API (phone_number_id + access_token)
+  - Twilio: GET account info (Basic auth)
+  - OpenRouter: GET `/api/v1/models` (Bearer token)
+  - n8n: GET `/api/v1/workflows` (X-N8N-API-KEY)
+  - Vercel: GET `/v9/projects` (Bearer token)
+- **4 providers com validacao de campos:** GA4, GTM, Google Ads, Meta Ads
+- Botao "Testar" na pagina de integracoes agora faz chamada real (antes era fake timeout)
+
+### Fase 9 — SEO Avancado (Keyword Tracker)
+- **Migration 024:** tabelas `seo_keywords` + `seo_competitors` com RLS
+- **CRUD:** `src/lib/supabase/seo-keywords.ts` (getSeoKeywords, addSeoKeyword, deleteSeoKeyword, updateSeoKeyword, getSeoCompetitors, addSeoCompetitor, deleteSeoCompetitor)
+- **API IA:** `/api/seo/suggest-keywords` — OpenRouter claude-sonnet-4 sugere 15 keywords baseado no contexto da org
+- **Componente:** `src/components/seo/keyword-tracker.tsx`
+  - KPIs: total keywords, top 10, melhoraram, posicao media
+  - Tabela: keyword, posicao, variacao, volume, dificuldade, URL
+  - Dialog de sugestoes IA com add individual
+- **SEO page** agora tem tabs: Analisador + Keywords
+
+### Fase 10 — Visitor Analytics (Comportamento)
+- **Migration 025:** tabelas `visitor_sessions` (unique org_id+session_id) + `page_analytics` (unique org_id+page_path+date) com RLS
+- **Lib:** `src/lib/supabase/visitor-analytics.ts` com getVisitorSessions, getPageAnalytics, getAnalyticsSummary
+- **Dashboard:** `/tracking/analytics`
+  - 5 KPIs: sessoes, page views, duracao media, scroll medio, taxa de rejeicao
+  - Device breakdown (desktop/mobile/tablet) com barra visual
+  - Source breakdown (top 10 fontes) com porcentagem
+  - Top Pages: tabela com views, unique visitors, scroll, tempo, bounce
+  - Recent Sessions: tabela com landing page, referrer, device, paginas, duracao, scroll
+  - Seletor de periodo (7/30/90 dias)
+- **Tracking Snippet:** `/api/tracking/snippet?orgId=xxx` gera JS para instalar em sites
+  - Coleta: pageview, session_end, heartbeat (30s)
+  - Dados: session_id, visitor_id, UTMs, device, scroll depth, duracao
+- **Collect Endpoint:** `/api/tracking/collect` recebe eventos via sendBeacon
+  - Upsert em visitor_sessions + page_analytics
+  - Aceita JSON via POST (content-type ou text)
+- **Sidebar:** adicionada pagina "Comportamento" na categoria Web
+
+### Fase 11 — Sidebar Reorganizada (anterior)
+- 10 categorias logicas com labels (Marketing, Leads & Segmentos, Email Marketing, Mensageria, Redes Sociais, Criativos, Web, Exportacoes)
+- Agora inclui link "Comportamento" em Web
+
+---
+
+## Plano de Evolucao — Fases 1-6 e 11 (2026-03-08)
+
+### Fase 1 — Limpeza
+- White Label e Multi-idioma removidos (modulos nao utilizados)
+- Settings simplificado de 10 para 8 tabs
+- Arquivos removidos: white-label-manager.tsx, language-selector.tsx, white-label.ts, locale-context.tsx, translations.ts
+
+### Fase 2 — Contexto por Org
+- `src/lib/supabase/org-context.ts`: getOrgContext(orgId) carrega briefing/ICP/persona/strategy completo
+- `src/hooks/use-org-context.ts`: useOrgMarketingContext() hook client-side
+- Chatbot enriched: system prompt recebe contexto da org automaticamente
+- LP Builder enriched: org_id passado para enriquecer geracoes
+
+### Fase 3 — Onboarding
+- `src/components/shared/setup-checklist.tsx`: 6 itens (briefing, estrategia, template, form, dominio, integracoes)
+- Progress bar, dismissable por org (localStorage), click-to-navigate
+- Redirect para `/marketing` apos criar org (sidebar + onboarding screen)
+
+### Fase 4 — Dashboard Expandido
+- 10 KPIs no dashboard: leads, taxa abertura, taxa clique, enviados, campanhas ativas, LPs, forms, submissoes, templates, segmentos
+- `src/lib/supabase/dashboard.ts` expandido com 6 queries adicionais
+
+### Fase 5 — Flow Builder WhatsApp
+- Migration 022: automation_flows, automation_executions, lead_tags, tag_definitions
+- `src/lib/supabase/automation-flows.ts`: CRUD completo + tags
+- 6 tipos de blocos: Message (text+buttons), Condition (field/operator/value), Smart Delay (wait_until/wait_for), Action (type+value), Webhook (URL+method), Tag (add/remove)
+- Editor visual com properties panel contextual e reorder
+
+### Fase 6 — Calendario de Conteudo
+- Migration 023: content_calendar (pillar, format, platform, status)
+- `src/lib/supabase/content-calendar.ts`: CRUD + HYESSER_PILLARS constants
+- `/api/content-calendar/generate`: IA gera ~30 posts/mes com Metodo Hyesser
+- Grid calendar view, pilar stats, create/edit dialogs, status management
+
+### Fase 11 — Sidebar Reorganizada
+- Navegacao de flat array para NavGroup[] com 10 categorias
+- Cada categoria com label e items agrupados
+
+---
+
 ## Fix Email Sending + Credenciais Completas (2026-03-07)
 
 ### Infraestrutura Completa

@@ -1,215 +1,131 @@
 # Status do Projeto — Plataforma Email
 
-**Ultima atualizacao:** 2026-03-07
-**Phase 1 MVP:** COMPLETA
-**Phase 2 (Analytics):** COMPLETA
-**Phase 3 (Automacoes):** COMPLETA
-**Phase 4 (WhatsApp + SMS):** COMPLETA
-**Phase 5 (Formularios):** COMPLETA
-**Backlog Futuro:** COMPLETO
-**Integracao Tracking GTM:** COMPLETA
-**Integracao LP Builder:** COMPLETA
-**Lead Tracking Journey:** COMPLETA
-**Dark Mode:** COMPLETO
-**Forms com UTM/Tracking:** COMPLETO
-**Credenciais:** CONFIGURADAS (Supabase, MailerSend, n8n, Vercel, OpenRouter)
-**Email Sending:** FUNCIONAL (MailerSend trial domain verificado)
+**Ultima atualizacao:** 2026-03-09
+**Plano de Evolucao (12 Fases):** 11 de 12 COMPLETAS
+**Fase 12 (Copy & Criativos):** PENDENTE (aguardando materiais do usuario)
 
 ---
 
-## O que foi construido (~250 arquivos)
+## Resumo Rapido
 
-### Modulos Funcionais
-
-| Modulo | Pages | Components | Data Layer | API Routes |
-|--------|-------|------------|------------|------------|
-| Auth | 4 | — | middleware | callback |
-| Dashboard | 1 | kpi-card, empty-state | dashboard.ts | — |
-| Leads | 4 | 9 (table, filters, form, info-card, tags, csv-wizard, timeline, tracking-journey) | leads.ts, lead-events.ts | webhook/leads |
-| Segments | 3 | 3 (table, form, rule-builder) | segments.ts | — |
-| Templates | 3 | 4 (table, filters, form, unlayer-editor) | templates.ts | send-test |
-| Campaigns | 3 | 3 (table, filters, form) | campaigns.ts | send route |
-| Analytics | 1 | — | integrations.ts | sync route |
-| Automations | 3 | 1 (automation-form) | automations.ts | trigger route |
-| WhatsApp | 3 | — | whatsapp.ts | send + webhook |
-| SMS | 1 | — | sms.ts | send + webhook |
-| Formularios | 3 | 1 (form-builder) | forms.ts | submit + embed.js |
-| Chatbot | 3 | — | chatbot.ts | chat + embed.js |
-| Tracking GTM | 5 | 16 (charts, badges, tables, timeline) | tracking/ (8 hooks + 6 lib) | journey |
-| Landing Pages | 3 | — | lp-builder/ (5 lib) + landing-pages.ts | chat + deploy |
-| Audience Export | 1 | — | audience-exports.ts | sync route |
-| SEO Analyzer | 1 | — | seo.ts | analyze route |
-| Social Media | 2 | — | social.ts | — |
-| Bio Links | 3+1 pub | 1 (bio-page-client) | bio-links.ts | track route |
-| Settings | 1 | 12 (org, members, invite, api-keys, domain, custom-fields, scoring, integrations, appearance, white-label, language) | white-label.ts | — |
-| Webhooks | — | — | — | 5 (mailersend, leads, events, whatsapp, sms) |
-
-### Infraestrutura
-
-| Item | Status | Detalhes |
-|------|--------|---------|
-| TypeScript | 0 erros | Strict mode, todas as interfaces tipadas |
-| Supabase Auth | Implementado | Login, registro, magic link, middleware |
-| Multi-tenancy | Implementado | RLS em todas as tabelas, org selector + criar org, roles |
-| Migrations | 16 arquivos | 40+ tabelas + RLS + triggers + functions |
-| shadcn/ui | 22 componentes | Todos os primitivos necessarios (incl. Switch, Tooltip) |
-| MailerSend | Client pronto | sendEmail, sendBulkEmail, webhook handler, scoring integrado |
-| Unlayer | Integrado | Editor drag-and-drop full-screen com merge tags PT-BR |
-| next-themes | Integrado | Dark mode (claro/escuro/sistema) com ThemeProvider |
-| n8n | Client pronto | REST API + webhook trigger |
-| GA4 | Client pronto | Data API v1 com OAuth refresh |
-| Meta Ads | Client pronto | Marketing API v19.0 |
-| WhatsApp | Client pronto | Cloud API v19.0 (text, template, interactive, media) |
-| Twilio SMS | Client pronto | REST API com dev-mode fallback |
-| Anthropic AI | Client pronto | Claude API para chatbot (dev fallback) |
-| Meta Audiences | Client pronto | Custom Audiences API com SHA256 |
-| Google Ads | Client pronto | Customer Match (placeholder) |
-| Social Publisher | Client pronto | Facebook Graph API + dev fallback |
-| SEO Analyzer | Engine pronta | 10+ checks (title, meta, H1, images, canonical, viewport, HTTPS, OG, performance) |
-| i18n | Implementado | 3 locales (pt-BR, en, es), ~60 chaves |
-| White Label | Implementado | Cores, logo, dominio, CSS customizado |
-| PWA | Implementado | Manifest, service worker, install prompt |
+| Area | Status |
+|------|--------|
+| Infra (Supabase, MailerSend, n8n, Vercel, OpenRouter) | ✅ Tudo configurado |
+| Auth + Multi-tenant | ✅ Funcionando |
+| Migrations | 25 arquivos (001-025), 50+ tabelas |
+| Modulos | 25 modulos funcionais |
+| Settings | 8 tabs |
+| Build | ✅ 0 erros TypeScript |
+| Deploy | Vercel (falta conectar repo) |
 
 ---
 
-## O que foi feito (por fase)
+## Modulos Funcionais (25)
 
-### Fase 1 — MVP (COMPLETA)
-- [x] Auth, Multi-tenant, CRUD Leads, Segmentos, Templates, Campanhas, Dashboard, Webhooks, Settings
-
-### Fase 2 — Analytics (COMPLETA)
-- [x] Lead timeline, Lead scoring, GA4, Meta Ads, Analytics page, Event logging
-
-### Fase 3 — Automacoes (COMPLETA)
-- [x] Engine (9 triggers, 9 acoes), n8n, Interface completa, Logs
-
-### Fase 4 — WhatsApp + SMS (COMPLETA)
-- [x] WhatsApp Cloud API, Inbox, Templates, Broadcasts, Twilio SMS
-
-### Fase 5 — Formularios (COMPLETA)
-- [x] Form builder, 4 modos embed, Submissao publica, Lead upsert
-
-### Backlog — Chatbot (COMPLETO)
-- [x] Chatbot com regras + IA (Claude), Widget embeddable, Conversas, Rules CRUD
-
-### Backlog — Exportacao de Publicos (COMPLETO)
-- [x] Meta Custom Audiences (SHA256), Google Ads Customer Match, Sync por segmento
-
-### Backlog — SEO Analyzer (COMPLETO)
-- [x] Engine de analise (10+ checks), Score 0-100, Issues/recomendacoes, Performance metrics
-
-### Backlog — Social Media (COMPLETO)
-- [x] Contas (5 plataformas), Posts (draft/schedule/publish), Calendario, Publisher
-
-### Backlog — Link da Bio (COMPLETO)
-- [x] Bio pages, Links com UTMs, Reorder, Click/view tracking, Pagina publica /b/[slug]
-
-### Backlog — Multi-idioma (COMPLETO)
-- [x] 3 locales (pt-BR, en, es), ~60 chaves, LocaleProvider, Seletor em Settings
-
-### Backlog — White Label (COMPLETO)
-- [x] App name, logo, favicon, 3 cores, dominio, CSS, hide branding, email footer
-
-### Backlog — App Mobile/PWA (COMPLETO)
-- [x] Manifest, service worker, install prompt, offline support
-
-### Lead Tracking Journey (COMPLETO)
-- [x] Componente lead-tracking-journey integrado na pagina do lead
-- [x] Jornada completa: sessoes, pageviews, atribuicao, eventos, deal info
-- [x] Multi-org (consulta tabelas legadas por email)
-
-### Dark Mode (COMPLETO)
-- [x] next-themes com ThemeProvider (claro/escuro/sistema)
-- [x] Aba "Aparencia" em Settings com preview visual
-- [x] CSS variaveis .dark ja existiam no globals.css
-
-### Formularios com Tracking (COMPLETO)
-- [x] 19 campos ocultos (UTMs + click IDs + sessao)
-- [x] Geracao de codigo HTML com script de tracking completo
-- [x] Configuracao de cookie domain e webhook URL
-
-### Integracoes UX (COMPLETO)
-- [x] Instrucoes passo-a-passo para cada integracao
-- [x] Links diretos para paineis/consoles dos servicos
-- [x] Help text em cada campo + toggle senha
+| Modulo | Status | Descricao |
+|--------|--------|-----------|
+| Auth | ✅ | Login, registro, magic link, middleware |
+| Dashboard | ✅ | 10 KPIs + setup checklist de onboarding |
+| Marketing (Briefing) | ✅ | 36 perguntas, estrategia IA, business plan, brand identity |
+| Leads | ✅ | CRUD, import CSV, tags, campos custom, timeline, tracking journey |
+| Segmentos | ✅ | Estaticos, dinamicos, rule builder |
+| Templates | ✅ | HTML + Unlayer drag-and-drop, merge tags, send test |
+| Campanhas | ✅ | Envio via MailerSend, agendamento, tracking |
+| Analytics | ✅ | GA4, Meta Ads, sync integracoes |
+| Automacoes | ✅ | 9 triggers, 9 acoes, logs, n8n |
+| WhatsApp | ✅ | Cloud API, inbox, templates, broadcasts |
+| Flow Builder | ✅ | 6 tipos de blocos, editor visual, tags, smart delay |
+| SMS | ✅ | Twilio, broadcasts, webhook status |
+| Formularios | ✅ | Builder, 4 modos embed, 26 campos ocultos tracking |
+| Chatbot | ✅ | Regras + IA (Claude), widget embeddable |
+| Tracking GTM | ✅ | 6 KPIs, 9 charts, multi-org, lead journey |
+| Visitor Analytics | ✅ | Sessoes, scroll depth, device/source, tracking snippet |
+| Landing Pages | ✅ | Chat IA, preview, deploy Vercel, custom domain |
+| Audience Exports | ✅ | Meta Custom Audiences, Google Ads Customer Match |
+| SEO | ✅ | Analisador 10+ checks + keyword tracker + sugestoes IA |
+| Social Media | ✅ | 5 plataformas, posts, calendario |
+| Bio Links | ✅ | Pagina publica /b/[slug], UTM tracking |
+| Content Calendar | ✅ | Metodo Hyesser 4 pilares, geracao IA 30 posts/mes |
+| Videos | ✅ | Roteiro IA, cenas, prompts Veo 3 + Nano Banana |
+| Integracoes | ✅ | 10 providers, teste real de credenciais |
+| Settings | ✅ | 8 tabs (org, membros, API keys, dominio, campos, scoring, integracoes, aparencia) |
 
 ---
 
-## O que falta
+## Plano de Evolucao — 12 Fases
 
-### Credenciais — Status (2026-03-07)
+### ✅ Fase 1 — Limpeza
+- White Label e Multi-idioma removidos (simplificacao)
+- Settings de 10 para 8 tabs
 
-| Servico | Status | Env Var |
-|---------|--------|---------|
-| Supabase URL + Anon Key | ✅ Configurado | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
-| Supabase Service Role | ✅ Configurado | `SUPABASE_SERVICE_ROLE_KEY` |
-| MailerSend | ✅ Configurado | `MAILERSEND_API_KEY`, `MAILERSEND_DEFAULT_DOMAIN` |
-| OpenRouter (IA) | ✅ Configurado | `OPENROUTER_API_KEY` |
-| n8n | ✅ Configurado | `N8N_BASE_URL`, `N8N_API_KEY` |
-| Vercel | ✅ Configurado | `VERCEL_ACCESS_TOKEN`, `VERCEL_TEAM_ID` |
-| MailerSend Webhooks | ⬜ Plano free | `MAILERSEND_WEBHOOK_SECRET` |
-| WhatsApp | ⬜ Opcional | `WHATSAPP_ACCESS_TOKEN`, etc. |
-| Twilio SMS | ⬜ Opcional | `TWILIO_ACCOUNT_SID`, etc. |
-| Meta/Google Ads | ⬜ Opcional | `META_ADS_ACCESS_TOKEN`, etc. |
+### ✅ Fase 2 — Contexto por Org
+- `getOrgContext()` carrega briefing/ICP/persona/strategy
+- Chatbot e LP Builder enriquecidos com contexto automatico
 
-### Para ir ao ar (bloqueante)
+### ✅ Fase 3 — Onboarding
+- Setup checklist no dashboard (6 itens)
+- Redirect para `/marketing` apos criar organizacao
 
-1. ~~Configurar `.env.local`~~ ✅ **FEITO** — todas as credenciais principais configuradas
+### ✅ Fase 4 — Dashboard Expandido
+- 10 KPIs de todos os modulos (leads, campanhas, LPs, forms, templates, segmentos)
 
-2. ~~Rodar migrations~~ ✅ **FEITO** — 19 migrations aplicadas, 40+ tabelas criadas
+### ✅ Fase 5 — Flow Builder WhatsApp
+- 6 tipos de blocos: Message, Condition, Smart Delay, Action, Webhook, Tag
+- Editor visual com reorder, properties panel contextual
+- Tags com convencao `[action]_[event]_[brand]`
 
-3. ~~Configurar Supabase Auth~~ ✅ **FEITO** — Email/Password habilitado, usuario confirmado, callback route funcional
+### ✅ Fase 6 — Calendario de Conteudo
+- Metodo Hyesser (4 pilares: Crescimento 44%, Conexao 22%, Quebra Objecoes 22%, Autoridade 12%)
+- Geracao IA de ~30 posts/mes via OpenRouter
+- Calendario grid, stats por pilar, status management
 
-4. ~~Configurar MailerSend~~ ✅ **FEITO** — 2 dominios verificados (rodriguinhodomarketing.com.br + trial), email testado HTTP 202
+### ✅ Fase 7 — LP Deploy Independente
+- `deployToVercelGeneric()` para qualquer org (nao so brands hardcoded)
+- Suporte a custom domain alias via Vercel API
+- Endpoint `/api/landing-pages/deploy` org-aware
 
-5. **Configurar WhatsApp Business** — app Meta, numero verificado, webhook URL (opcional)
+### ✅ Fase 8 — Integracoes UX
+- Teste REAL de credenciais via `/api/integrations/test`
+- 6 providers com chamada live: MailerSend, WhatsApp, Twilio, OpenRouter, n8n, Vercel
+- 4 providers com validacao de campos: GA4, GTM, Google Ads, Meta Ads
 
-6. ~~Criar icones PWA~~ ✅ **FEITO** — icon-192x192.png e icon-512x512.png criados
+### ✅ Fase 9 — SEO Avancado
+- Keyword tracker com KPIs (posicao, volume, dificuldade)
+- Sugestoes de keywords via IA (analisa contexto da org)
+- SEO page com tabs: Analisador + Keywords
+- Migration 024: `seo_keywords` + `seo_competitors`
 
-7. **Deploy na Vercel** — conectar repo + env vars (**UNICO BLOQUEANTE**)
+### ✅ Fase 10 — Visitor Analytics
+- Dashboard de comportamento: sessoes, scroll depth, device/source
+- Tracking snippet JS para instalar em sites externos
+- Endpoints: `/api/tracking/collect` + `/api/tracking/snippet`
+- Migration 025: `visitor_sessions` + `page_analytics`
 
-### Itens pendentes (nao-bloqueantes)
+### ✅ Fase 11 — Sidebar Reorganizada
+- 10 categorias logicas com labels
+- 22 itens organizados por funcao
 
-| Item | Fase | Descricao |
-|------|------|-----------|
-| Mapear dados GTM | 2 | Normalizar dados GTM existentes |
-| Leads anonimos | 2 | Identificacao anonimos → conhecidos |
-| Ranking de leads | 2 | Visualizacao ranking por score |
-| Listas inteligentes | 2 | Segmentos com auto-update |
-| Trigger por data | 3 | Automacao por data (aniversario) |
-| Drip campaigns | 3 | Sequencias de email |
-| Fluxos conversacionais | 4 | Builder estilo ManyChat |
-| Tags de WhatsApp | 4 | Tags para conversas WA |
-| Pop-ups | 5 | Regras tempo/scroll/exit intent |
-| Botao WA tracking | 5 | Botao WhatsApp embeddable |
-| Web Push | 5 | Notificacoes push browser |
-| A/B testing forms | 5 | Testes A/B formularios |
-| Page builder LPs | 5 | Landing pages |
+### ⬜ Fase 12 — Copy & Criativos
+- Aguardando materiais do usuario (estrutura webinar, estrutura copy, ideias criativos)
 
 ---
 
-## Todas as paginas testadas (30+ paginas + 15+ API routes)
+## Migrations (25 arquivos)
 
-| Pagina | Status |
-|--------|--------|
-| `/` (Dashboard) | 200 |
-| `/login`, `/register`, `/magic-link` | 200 |
-| `/leads`, `/leads/new`, `/leads/import`, `/leads/[id]` | 200 |
-| `/segments`, `/segments/new`, `/segments/[id]` | 200 |
-| `/templates`, `/templates/new`, `/templates/[id]` | 200 |
-| `/campaigns`, `/campaigns/new`, `/campaigns/[id]` | 200 |
-| `/analytics` | 200 |
-| `/automations`, `/automations/new`, `/automations/[id]` | 200 |
-| `/whatsapp`, `/whatsapp/templates`, `/whatsapp/broadcasts` | 200 |
-| `/sms` | 200 |
-| `/forms`, `/forms/new`, `/forms/[id]` | 200 |
-| `/chatbot`, `/chatbot/new`, `/chatbot/[id]` | 200 |
-| `/audience-exports` | 200 |
-| `/seo` | 200 |
-| `/social`, `/social/new` | 200 |
-| `/bio`, `/bio/new`, `/bio/[id]` | 200 |
-| `/b/[slug]` (publico) | 200/404 |
-| `/settings` (10 tabs) | 200 |
+| # | Arquivo | Tabelas |
+|---|---------|---------|
+| 001-017 | Core | organizations, leads, segments, templates, campaigns, automations, whatsapp, sms, chatbot, audiences, seo, social, bio, white_label, landing_pages, etc. |
+| 018 | Fix RLS | get_user_org_ids() + is_org_admin() SECURITY DEFINER |
+| 019 | Marketing | org_marketing_profiles + industry_benchmarks |
+| 020 | Org RPC | create_organization_with_member() |
+| 021 | Videos | video_projects + video_scenes |
+| 022 | Flows | automation_flows + automation_executions + lead_tags + tag_definitions |
+| 023 | Calendar | content_calendar (Metodo Hyesser) |
+| 024 | SEO KW | seo_keywords + seo_competitors |
+| 025 | Analytics | visitor_sessions + page_analytics |
+
+**Aplicadas no Supabase:** 001-019
+**Pendentes de aplicar:** 020-025
 
 ---
 
@@ -217,80 +133,144 @@
 
 ```
 Dashboard
-Leads
-Segmentos
-Templates
-Campanhas
-Analytics
-Automacoes
-WhatsApp
-SMS
-Formularios
-Chatbot
-Publicos
-SEO
+
+Marketing
+  Estrategia
+  Calendario
+
+Leads & Segmentos
+  Leads
+  Segmentos
+  Formularios
+
+Email Marketing
+  Campanhas
+  Templates
+  Automacoes
+  Analytics
+
+Mensageria
+  WhatsApp
+  Fluxos
+  SMS
+  Chatbot
+
 Redes Sociais
-Link da Bio
-Configuracoes (10 tabs)
+  Posts
+  Link da Bio
+
+Criativos
+  Videos
+
+Web
+  Landing Pages
+  SEO
+  Tracking
+  Comportamento
+
+Exportacoes
+  Publicos
+
+Configuracoes
 ```
 
 ---
 
-## Arvore de arquivos
+## Credenciais
 
+| Servico | Status | Env Var |
+|---------|--------|---------|
+| Supabase URL + Anon Key | ✅ | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
+| Supabase Service Role | ✅ | `SUPABASE_SERVICE_ROLE_KEY` |
+| MailerSend | ✅ | `MAILERSEND_API_KEY`, `MAILERSEND_DEFAULT_DOMAIN` |
+| OpenRouter (IA) | ✅ | `OPENROUTER_API_KEY` |
+| n8n | ✅ | `N8N_BASE_URL`, `N8N_API_KEY` |
+| Vercel | ✅ | `VERCEL_ACCESS_TOKEN`, `VERCEL_TEAM_ID` |
+| WhatsApp | ⬜ Opcional | `WHATSAPP_ACCESS_TOKEN`, etc. |
+| Twilio SMS | ⬜ Opcional | `TWILIO_ACCOUNT_SID`, etc. |
+| Meta/Google Ads | ⬜ Opcional | Via settings/integracoes |
+
+---
+
+## Para testar
+
+### Pre-requisitos
+1. `npm install`
+2. `.env.local` com as credenciais acima
+3. Aplicar migrations 020-025 no Supabase (via SQL Editor)
+
+### Rodar local
+```bash
+npm run dev
+# Abrir http://localhost:3000
+# Login: rodrigoosouzaamarketing@gmail.com
 ```
-src/
-  app/
-    (auth)/login, register, magic-link
-    (dashboard)/
-      page.tsx
-      leads/ (page, new, import, [id])
-      segments/ (page, new, [id])
-      templates/ (page, new, [id])
-      campaigns/ (page, new, [id])
-      analytics/page.tsx
-      automations/ (page, new, [id])
-      whatsapp/ (page, templates, broadcasts)
-      sms/page.tsx
-      forms/ (page, new, [id])
-      chatbot/ (page, new, [id])
-      audience-exports/page.tsx
-      seo/page.tsx
-      social/ (page, new)
-      bio/ (page, new, [id])
-      settings/page.tsx (10 tabs)
-    api/
-      campaigns/[id]/send/
-      templates/send-test/
-      analytics/sync/
-      automations/trigger/
-      whatsapp/send/
-      sms/send/ + webhook/
-      forms/[id]/submit/ + embed.js/
-      chatbot/[id]/chat/ + embed.js/
-      audience-exports/[id]/sync/
-      seo/analyze/
-      bio/track/
-      webhooks/ (mailersend, leads, events, whatsapp)
-    b/[slug]/ (bio page publica)
-    auth/callback/
-  components/
-    ui/ (22 shadcn/ui)
-    layout/ (sidebar, header)
-    shared/ (kpi-card, empty-state, pwa-register, pwa-install-prompt, theme-provider)
-    leads/ (8), segments/ (3), templates/ (4), campaigns/ (3)
-    automations/ (1), forms/ (1)
-    settings/ (12 incl. appearance, white-label, language)
-  lib/
-    supabase/ (client, server, admin, middleware, +15 data helpers)
-    mailersend/, analytics/, whatsapp/, sms/, n8n/
-    chatbot/, audience/, seo/, social/
-    i18n/translations.ts
-    automation-engine.ts, template-utils.ts
-    types.ts, constants.ts, utils.ts, csv.ts
-  hooks/ (7), contexts/ (organization, locale)
-  public/
-    manifest.json, sw.js, icons/
-supabase/
-  migrations/ (16 SQL files, 40+ tabelas)
-```
+
+### Testar modulos novos
+1. **SEO Keywords** — `/seo` > tab Keywords > Adicionar keyword ou clicar "Sugestoes IA"
+2. **Visitor Analytics** — `/tracking/analytics` (precisa de dados na tabela visitor_sessions)
+3. **Teste de Integracoes** — `/settings` > tab Integracoes > clicar "Testar" (valida credenciais em tempo real)
+4. **Content Calendar** — `/content-calendar` > selecionar mes > "Gerar com IA"
+5. **Flow Builder** — `/whatsapp/flows` > Criar Fluxo > Adicionar blocos
+6. **Deploy LP** — `/landing-pages/new` > gerar LP > Deploy (usa Vercel)
+
+---
+
+## Todas as paginas (40+ rotas)
+
+| Rota | Tipo |
+|------|------|
+| `/` | Dashboard |
+| `/login`, `/register`, `/magic-link`, `/reset-password`, `/update-password` | Auth |
+| `/marketing` | Briefing + Estrategia IA |
+| `/content-calendar` | Calendario Conteudo |
+| `/leads`, `/leads/new`, `/leads/import`, `/leads/[id]` | Leads |
+| `/segments`, `/segments/new`, `/segments/[id]` | Segmentos |
+| `/forms`, `/forms/new`, `/forms/[id]` | Formularios |
+| `/campaigns`, `/campaigns/new`, `/campaigns/[id]` | Campanhas |
+| `/templates`, `/templates/new`, `/templates/[id]` | Templates |
+| `/automations`, `/automations/new`, `/automations/[id]` | Automacoes |
+| `/analytics` | Analytics |
+| `/whatsapp`, `/whatsapp/templates`, `/whatsapp/broadcasts` | WhatsApp |
+| `/whatsapp/flows`, `/whatsapp/flows/[id]` | Flow Builder |
+| `/sms` | SMS |
+| `/chatbot`, `/chatbot/new`, `/chatbot/[id]` | Chatbot |
+| `/tracking`, `/tracking/leads`, `/tracking/leads/[email]`, `/tracking/campaigns`, `/tracking/conversions` | Tracking GTM |
+| `/tracking/analytics` | Visitor Analytics |
+| `/landing-pages`, `/landing-pages/new`, `/landing-pages/[id]` | Landing Pages |
+| `/seo` | SEO (Analisador + Keywords) |
+| `/social`, `/social/new` | Redes Sociais |
+| `/bio`, `/bio/new`, `/bio/[id]` | Bio Links |
+| `/b/[slug]` | Bio (publico) |
+| `/videos`, `/videos/new`, `/videos/[id]` | Videos |
+| `/audience-exports` | Publicos |
+| `/settings` | Configuracoes (8 tabs) |
+
+### API Routes (20+)
+
+| Rota | Metodo | Funcao |
+|------|--------|--------|
+| `/api/campaigns/[id]/send` | POST | Enviar campanha |
+| `/api/templates/send-test` | POST | Enviar email teste |
+| `/api/analytics/sync` | POST | Sincronizar analytics |
+| `/api/automations/trigger` | POST | Disparar automacao |
+| `/api/whatsapp/send` | POST | Enviar WhatsApp |
+| `/api/sms/send` | POST | Enviar SMS |
+| `/api/forms/[id]/submit` | POST | Submeter formulario |
+| `/api/forms/[id]/embed.js` | GET | Script embed form |
+| `/api/chatbot/[id]/chat` | POST | Chat com bot |
+| `/api/chatbot/[id]/embed.js` | GET | Script embed chatbot |
+| `/api/audience-exports/[id]/sync` | POST | Sync publicos |
+| `/api/seo/analyze` | POST | Analisar URL |
+| `/api/seo/suggest-keywords` | POST | Sugestoes IA keywords |
+| `/api/bio/track` | POST | Track bio click |
+| `/api/lp-builder/chat` | POST | Chat LP Builder |
+| `/api/lp-builder/deploy` | POST | Deploy LP (brand) |
+| `/api/landing-pages/deploy` | POST | Deploy LP (org) |
+| `/api/marketing/generate-strategy` | POST | Gerar estrategia IA |
+| `/api/content-calendar/generate` | POST | Gerar calendario IA |
+| `/api/integrations/test` | POST | Testar credenciais |
+| `/api/tracking/collect` | POST | Coletar eventos tracking |
+| `/api/tracking/snippet` | GET | Gerar snippet tracking |
+| `/api/tracking/journey` | GET | Jornada do lead |
+| `/api/webhooks/*` | POST | Webhooks (MailerSend, leads, events, WhatsApp, SMS) |
