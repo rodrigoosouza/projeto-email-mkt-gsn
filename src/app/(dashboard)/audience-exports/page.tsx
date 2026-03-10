@@ -131,7 +131,7 @@ export default function AudienceExportsPage() {
         org_id: orgId,
         name: newName,
         platform: newPlatform,
-        segment_id: newSegmentId || null,
+        segment_id: newSegmentId && newSegmentId !== 'all' ? newSegmentId : null,
         config: {},
         created_by: user.id,
       })
