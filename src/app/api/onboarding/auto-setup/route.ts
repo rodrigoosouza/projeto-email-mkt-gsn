@@ -169,6 +169,80 @@ export async function POST(req: NextRequest) {
       results.campaign = campaign
     }
 
+    // 5. Generate ad campaigns (Meta Ads + Google Ads)
+    results.adCampaigns = []
+    try {
+      const adsRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: 'anthropic/claude-sonnet-4',
+          max_tokens: 8000,
+          messages: [
+            {
+              role: 'system',
+              content: 'Voce e um especialista em trafego pago. Gere campanhas em JSON valido. Responda APENAS com o JSON array.',
+            },
+            {
+              role: 'user',
+              content: `Crie 4 campanhas de ads (2 Meta Ads + 2 Google Ads) para esta empresa:
+
+${orgContext.summary}
+
+Para cada campanha:
+{
+  "name": "Nome",
+  "platform": "meta_ads" ou "google_ads",
+  "campaign_type": "lead_generation|traffic|awareness|retargeting",
+  "objective": "Descricao curta",
+  "target_audience": { "age_min": 25, "age_max": 55, "interests": ["..."], "locations": ["Brasil"] },
+  "budget_daily": 50.00,
+  "ad_creatives": [{ "headline": "max 40 chars", "description": "max 125 chars", "image_prompt": "prompt para imagem", "cta": "CTA" }],
+  "copy_variants": [{ "primary_text": "max 250 chars", "headline": "titulo", "description": "desc", "cta": "CTA" }]
+}
+
+Retorne APENAS o JSON array.`,
+            },
+          ],
+        }),
+      })
+
+      if (adsRes.ok) {
+        const adsData = await adsRes.json()
+        const adsContent = adsData.choices[0].message.content || ''
+        const adsMatch = adsContent.match(/\[[\s\S]*\]/)
+        if (adsMatch) {
+          const adsCampaigns = JSON.parse(adsMatch[0])
+          const adRows = adsCampaigns.map((c: any) => ({
+            org_id: orgId,
+            name: c.name,
+            platform: c.platform || 'meta_ads',
+            campaign_type: c.campaign_type || 'lead_generation',
+            status: 'draft',
+            objective: c.objective,
+            target_audience: c.target_audience || {},
+            budget_daily: c.budget_daily || 50,
+            ad_creatives: c.ad_creatives || [],
+            copy_variants: c.copy_variants || [],
+            ai_generated: true,
+            created_by: user.id,
+          }))
+
+          const { data: savedAds } = await admin
+            .from('ad_campaigns')
+            .insert(adRows)
+            .select()
+
+          results.adCampaigns = savedAds || []
+        }
+      }
+    } catch (adsError) {
+      console.error('[Auto Setup] Ads generation error (non-blocking):', adsError)
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Setup automatico concluido',
@@ -176,6 +250,7 @@ export async function POST(req: NextRequest) {
         form: results.form ? 1 : 0,
         templates: results.templates.length,
         campaign: results.campaign ? 1 : 0,
+        adCampaigns: results.adCampaigns.length,
       },
       results,
     })

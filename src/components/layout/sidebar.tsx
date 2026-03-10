@@ -32,6 +32,7 @@ import {
   Workflow,
   CalendarDays,
   MousePointerClick,
+  Megaphone,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -102,6 +103,13 @@ const navigationGroups: NavGroup[] = [
     ],
   },
   {
+    label: 'Trafego Pago',
+    items: [
+      { name: 'Campanhas Ads', href: '/ads', icon: Megaphone },
+      { name: 'Publicos', href: '/audience-exports', icon: Share2 },
+    ],
+  },
+  {
     label: 'Mensageria',
     items: [
       { name: 'WhatsApp', href: '/whatsapp', icon: MessageCircle },
@@ -130,12 +138,6 @@ const navigationGroups: NavGroup[] = [
       { name: 'SEO', href: '/seo', icon: Search },
       { name: 'Tracking', href: '/tracking', icon: Activity },
       { name: 'Comportamento', href: '/tracking/analytics', icon: MousePointerClick },
-    ],
-  },
-  {
-    label: 'Exportacoes',
-    items: [
-      { name: 'Publicos', href: '/audience-exports', icon: Share2 },
     ],
   },
   {
