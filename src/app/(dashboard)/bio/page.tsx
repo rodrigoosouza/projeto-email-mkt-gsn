@@ -67,7 +67,7 @@ export default function BioPage() {
   }
 
   const handleCopyUrl = (slug: string) => {
-    const url = `${window.location.origin}/bio/${slug}`
+    const url = `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/b/${slug}`
     navigator.clipboard.writeText(url)
     toast({ title: 'URL copiada para a area de transferencia' })
   }
@@ -131,7 +131,7 @@ export default function BioPage() {
                     <CardTitle className="text-base">{page.title}</CardTitle>
                     <p className="text-sm text-muted-foreground flex items-center gap-1">
                       <ExternalLink className="h-3 w-3" />
-                      /bio/{page.slug}
+                      /b/{page.slug}
                     </p>
                   </div>
                   <Badge variant={page.is_active ? 'default' : 'secondary'}>

@@ -208,7 +208,7 @@ export default function BioDetailPage() {
   }
 
   const handleCopyUrl = () => {
-    const url = `${window.location.origin}/bio/${slug}`
+    const url = `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/b/${slug}`
     navigator.clipboard.writeText(url)
     toast({ title: 'URL copiada' })
   }
@@ -248,7 +248,7 @@ export default function BioDetailPage() {
             <h2 className="text-2xl font-bold tracking-tight">{page.title}</h2>
             <p className="text-sm text-muted-foreground flex items-center gap-1">
               <ExternalLink className="h-3 w-3" />
-              /bio/{page.slug}
+              /b/{page.slug}
             </p>
           </div>
         </div>
@@ -259,7 +259,7 @@ export default function BioDetailPage() {
           </Button>
           <Button variant="outline" size="sm" asChild>
             <a
-              href={`/bio/${page.slug}`}
+              href={`/b/${page.slug}`}
               target="_blank"
               rel="noopener noreferrer"
             >
