@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   Sparkles, User, Building2, Clock, Search, Megaphone, Globe, BarChart3,
   Loader2, Copy, Check, ChevronDown, ChevronUp, Eye, EyeOff, Target, TrendingUp,
-  ExternalLink, ClipboardCopy,
+  ExternalLink, ClipboardCopy, Link2, Rocket, CheckCircle2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -17,7 +17,16 @@ import { GoogleAdsPreview } from './google-ads-preview'
 import { CROPagePreview } from './cro-page-preview'
 import { cn } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import type { MarketingProfile, Persona, ICP, Campanha, PaginaCRO } from '@/lib/marketing/types'
+
+interface DeployedLP {
+  id: string
+  name: string
+  deploy_url: string | null
+  status: string
+  created_at: string
+}
 
 interface StrategyViewerProps {
   profile: MarketingProfile
@@ -308,12 +317,34 @@ export function StrategyViewer({ profile, onRefresh }: StrategyViewerProps) {
   const { toast } = useToast()
   const router = useRouter()
   const [generating, setGenerating] = useState(false)
+  const [settingUp, setSettingUp] = useState(false)
+  const [setupDone, setSetupDone] = useState(false)
+  const [setupResults, setSetupResults] = useState<Record<string, any> | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
   const [expandedCampaigns, setExpandedCampaigns] = useState<string[]>(['topo'])
   const [showAdsPreview, setShowAdsPreview] = useState(false)
   const [showCROPreview, setShowCROPreview] = useState(false)
+  const [deployedLPs, setDeployedLPs] = useState<DeployedLP[]>([])
 
   const hasStrategy = !!profile.persona && !!profile.icp
+
+  // Fetch deployed landing pages for CRO tab
+  const fetchLPs = useCallback(async () => {
+    if (!currentOrg?.id) return
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('landing_pages')
+      .select('id, name, deploy_url, status, created_at')
+      .eq('org_id', currentOrg.id)
+      .not('deploy_url', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(5)
+    if (data) setDeployedLPs(data)
+  }, [currentOrg?.id])
+
+  useEffect(() => {
+    fetchLPs()
+  }, [fetchLPs])
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text)
@@ -346,11 +377,44 @@ export function StrategyViewer({ profile, onRefresh }: StrategyViewerProps) {
       await saveStrategy(currentOrg.id, data.persona, data.icp, data.strategy, data.model)
       toast({ title: 'Estrategia gerada com sucesso!' })
       onRefresh()
+
+      // Auto-trigger full setup (form, emails, campaigns, ads, calendar)
+      triggerAutoSetup()
     } catch (error) {
       console.error('Erro:', error)
       toast({ title: 'Erro ao gerar estrategia', description: error instanceof Error ? error.message : 'Erro', variant: 'destructive' })
     } finally {
       setGenerating(false)
+    }
+  }
+
+  const triggerAutoSetup = async () => {
+    if (!currentOrg?.id) return
+    setSettingUp(true)
+    setSetupDone(false)
+    try {
+      const res = await fetch('/api/onboarding/auto-setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orgId: currentOrg.id }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setSetupResults(data)
+        setSetupDone(true)
+        toast({
+          title: 'Tudo criado automaticamente!',
+          description: `Formulario, ${data.templates || 5} emails, ${data.campaigns || 5} campanhas, ${data.ads || 6} anuncios, ${data.calendarPosts || 30} posts no calendario.`,
+        })
+        fetchLPs()
+      } else {
+        toast({ title: 'Erro no auto-setup', description: data.error || 'Erro desconhecido', variant: 'destructive' })
+      }
+    } catch (error) {
+      console.error('Auto-setup error:', error)
+      toast({ title: 'Erro no auto-setup', description: 'Falha ao criar ativos automaticamente.', variant: 'destructive' })
+    } finally {
+      setSettingUp(false)
     }
   }
 
@@ -632,6 +696,37 @@ export function StrategyViewer({ profile, onRefresh }: StrategyViewerProps) {
                   </Button>
                 </div>
 
+                {/* Deployed Landing Pages */}
+                {deployedLPs.length > 0 && (
+                  <Card className="border-primary/30 bg-primary/5">
+                    <CardContent className="py-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Link2 className="w-4 h-4 text-primary" />
+                        <span className="font-semibold text-sm">Landing Pages Publicadas</span>
+                      </div>
+                      <div className="space-y-2">
+                        {deployedLPs.map((lp) => (
+                          <div key={lp.id} className="flex items-center justify-between p-2 bg-background rounded-lg">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+                              <span className="text-sm truncate">{lp.name || 'Landing Page'}</span>
+                            </div>
+                            <a
+                              href={lp.deploy_url!}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-xs text-primary hover:underline flex-shrink-0"
+                            >
+                              {lp.deploy_url!.replace('https://', '').slice(0, 40)}
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
                 {showCROPreview && strategy.paginaCRO ? (
                   <CROPagePreview
                     paginaCRO={strategy.paginaCRO}
@@ -726,6 +821,135 @@ export function StrategyViewer({ profile, onRefresh }: StrategyViewerProps) {
             {/* CAMPAIGNS */}
             <TabsContent value="campaigns">
               <div className="space-y-4">
+                {/* Auto-setup status banner */}
+                {settingUp && (
+                  <Card className="border-blue-500/30 bg-blue-500/5">
+                    <CardContent className="py-4 flex items-center gap-3">
+                      <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                      <div>
+                        <p className="text-sm font-medium">Criando ativos automaticamente...</p>
+                        <p className="text-xs text-muted-foreground">Formulario, emails, campanhas, anuncios e calendario</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {setupDone && setupResults && (
+                  <Card className="border-green-500/30 bg-green-500/5">
+                    <CardContent className="py-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Rocket className="w-4 h-4 text-green-500" />
+                        <span className="font-semibold text-sm text-green-700">Tudo criado automaticamente!</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {setupResults.form && <Badge variant="secondary">1 Formulario</Badge>}
+                        {setupResults.templates > 0 && <Badge variant="secondary">{setupResults.templates} Templates</Badge>}
+                        {setupResults.campaigns > 0 && <Badge variant="secondary">{setupResults.campaigns} Campanhas Email</Badge>}
+                        {setupResults.ads > 0 && <Badge variant="secondary">{setupResults.ads} Anuncios</Badge>}
+                        {setupResults.automation && <Badge variant="secondary">1 Automacao</Badge>}
+                        {setupResults.calendarPosts > 0 && <Badge variant="secondary">{setupResults.calendarPosts} Posts</Badge>}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Schedule summary from strategy */}
+                {strategy.horarios && (
+                  <Card className="border-blue-500/20">
+                    <CardContent className="py-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Clock className="w-4 h-4 text-blue-500" />
+                        <span className="font-semibold text-sm">Horarios de Veiculacao Recomendados</span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="p-3 bg-muted/50 rounded-lg">
+                          <span className="text-xs text-muted-foreground font-medium">Intencao Alta</span>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {strategy.horarios.intencaoAlta?.map((h, i) => (
+                              <Badge key={i} variant="default" className="text-xs">{h}</Badge>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="p-3 bg-muted/50 rounded-lg">
+                          <span className="text-xs text-muted-foreground font-medium">Pesquisa Emocional</span>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {strategy.horarios.pesquisaEmocional?.map((h, i) => (
+                              <Badge key={i} variant="outline" className="text-xs">{h}</Badge>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="p-3 bg-muted/50 rounded-lg">
+                          <span className="text-xs text-muted-foreground font-medium">Comercial B2B</span>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {strategy.horarios.comercialB2B?.map((h, i) => (
+                              <Badge key={i} variant="secondary" className="text-xs">{h}</Badge>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      {strategy.horarios.recomendacaoOtimizacao && (
+                        <p className="text-xs text-muted-foreground mt-2 italic">{strategy.horarios.recomendacaoOtimizacao}</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Keywords summary */}
+                {strategy.palavrasChave && (
+                  <Card className="border-purple-500/20">
+                    <CardContent className="py-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Search className="w-4 h-4 text-purple-500" />
+                        <span className="font-semibold text-sm">Palavras-chave da Estrategia</span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <span className="text-xs text-muted-foreground font-medium">Topo de Funil</span>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {strategy.palavrasChave.topo?.slice(0, 6).map((kw, i) => (
+                              <Badge key={i} variant="outline" className="text-xs">{kw}</Badge>
+                            ))}
+                            {(strategy.palavrasChave.topo?.length || 0) > 6 && (
+                              <Badge variant="secondary" className="text-xs">+{strategy.palavrasChave.topo!.length - 6}</Badge>
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-xs text-muted-foreground font-medium">Dor / Fundo de Funil</span>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {strategy.palavrasChave.dorContratacao?.slice(0, 6).map((kw, i) => (
+                              <Badge key={i} variant="default" className="text-xs">{kw}</Badge>
+                            ))}
+                            {(strategy.palavrasChave.dorContratacao?.length || 0) > 6 && (
+                              <Badge variant="secondary" className="text-xs">+{strategy.palavrasChave.dorContratacao!.length - 6}</Badge>
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-xs text-muted-foreground font-medium">Defesa de Marca</span>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {strategy.palavrasChave.defesaMarca?.map((kw, i) => (
+                              <Badge key={i} variant="secondary" className="text-xs">{kw}</Badge>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-xs text-muted-foreground font-medium">Negativas</span>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {strategy.palavrasChave.negativas?.slice(0, 8).map((kw, i) => (
+                              <Badge key={i} variant="outline" className="text-xs text-destructive border-destructive/30">{kw}</Badge>
+                            ))}
+                            {(strategy.palavrasChave.negativas?.length || 0) > 8 && (
+                              <Badge variant="secondary" className="text-xs">+{strategy.palavrasChave.negativas!.length - 8}</Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Campaign cards */}
                 {strategy.campanhas &&
                   (['topo', 'dorContratacao', 'defesaMarca', 'remarketing'] as const).map((key) => {
                     const campanha = strategy.campanhas[key] as Campanha
@@ -840,6 +1064,23 @@ export function StrategyViewer({ profile, onRefresh }: StrategyViewerProps) {
                       </Card>
                     )
                   })}
+
+                {/* Manual trigger auto-setup */}
+                {!settingUp && !setupDone && hasStrategy && (
+                  <Card className="border-dashed">
+                    <CardContent className="py-6 text-center space-y-3">
+                      <Rocket className="w-8 h-8 mx-auto text-muted-foreground" />
+                      <div>
+                        <p className="font-medium text-sm">Criar todos os ativos automaticamente</p>
+                        <p className="text-xs text-muted-foreground mt-1">Formulario, emails, campanhas, anuncios e calendario de conteudo</p>
+                      </div>
+                      <Button size="sm" onClick={triggerAutoSetup}>
+                        <Rocket className="w-4 h-4 mr-1" />
+                        Criar Tudo com IA
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
             </TabsContent>
           </>
