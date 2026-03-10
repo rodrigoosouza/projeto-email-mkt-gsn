@@ -21,6 +21,12 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs'
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -34,6 +40,7 @@ import { useToast } from '@/components/ui/use-toast'
 import { useOrganizationContext } from '@/contexts/organization-context'
 import { useAuth } from '@/hooks/use-auth'
 import { getSeoAnalyses, deleteSeoAnalysis } from '@/lib/supabase/seo'
+import { KeywordTracker } from '@/components/seo/keyword-tracker'
 import type { SeoAnalysis, SeoIssue } from '@/lib/types'
 import { SEO_ISSUE_TYPE_LABELS, SEO_ISSUE_TYPE_COLORS } from '@/lib/constants'
 import { format } from 'date-fns'
@@ -182,11 +189,23 @@ export default function SeoPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">Analisador SEO</h2>
+        <h2 className="text-2xl font-bold tracking-tight">SEO</h2>
         <p className="text-muted-foreground">
-          Analise qualquer URL e obtenha recomendacoes de SEO.
+          Analise URLs, monitore keywords e acompanhe seu posicionamento.
         </p>
       </div>
+
+      <Tabs defaultValue="analyzer" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="analyzer">Analisador</TabsTrigger>
+          <TabsTrigger value="keywords">Keywords</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="keywords">
+          <KeywordTracker />
+        </TabsContent>
+
+        <TabsContent value="analyzer" className="space-y-6">
 
       {/* URL Input */}
       <Card>
@@ -533,6 +552,9 @@ export default function SeoPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

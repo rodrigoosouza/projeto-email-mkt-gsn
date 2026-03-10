@@ -335,13 +335,24 @@ export function IntegrationsManager() {
   }
 
   const handleTestConnection = async (provider: IntegrationProvider, providerName: string) => {
+    const config = configs[provider]
+    if (!config || Object.values(config).every((v) => !v)) {
+      toast({ title: 'Preencha os campos', description: 'Insira as credenciais antes de testar.', variant: 'destructive' })
+      return
+    }
     setTesting(provider)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-      toast({
-        title: 'Teste de conexao',
-        description: `Conexao com ${providerName} verificada com sucesso.`,
+      const res = await fetch('/api/integrations/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, config }),
       })
+      const result = await res.json()
+      if (result.success) {
+        toast({ title: 'Conexao verificada', description: result.message })
+      } else {
+        toast({ title: 'Falha no teste', description: result.message, variant: 'destructive' })
+      }
     } catch (error: any) {
       toast({
         title: 'Falha no teste',

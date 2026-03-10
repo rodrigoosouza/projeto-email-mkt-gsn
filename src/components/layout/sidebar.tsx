@@ -31,6 +31,7 @@ import {
   Video,
   Workflow,
   CalendarDays,
+  MousePointerClick,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -128,6 +129,7 @@ const navigationGroups: NavGroup[] = [
       { name: 'Landing Pages', href: '/landing-pages', icon: Globe },
       { name: 'SEO', href: '/seo', icon: Search },
       { name: 'Tracking', href: '/tracking', icon: Activity },
+      { name: 'Comportamento', href: '/tracking/analytics', icon: MousePointerClick },
     ],
   },
   {
