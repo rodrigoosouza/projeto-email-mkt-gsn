@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import { createClient } from '@supabase/supabase-js'
-import { TRACKING_ORGANIZATIONS, getAllOrgTables } from '@/lib/tracking/organizations'
+import { TRACKING_ORGANIZATIONS, getAllOrgTables, findTrackingOrgBySlug } from '@/lib/tracking/organizations'
 import type { OrgTables } from '@/lib/tracking/organizations'
 
 // Separate client for legacy tracking tables — uses anon key without user session
@@ -25,49 +25,96 @@ export async function GET(req: NextRequest) {
     }
 
     const email = req.nextUrl.searchParams.get('email')
+    const phone = req.nextUrl.searchParams.get('phone')
     const orgSlug = req.nextUrl.searchParams.get('orgSlug')
 
-    if (!email) {
-      return NextResponse.json({ error: 'Email is required' }, { status: 400 })
+    if (!email && !phone) {
+      return NextResponse.json({ error: 'Email or phone is required' }, { status: 400 })
     }
 
     // Determine which org tables to query
     let orgTablesList: OrgTables[]
     if (orgSlug) {
-      const org = TRACKING_ORGANIZATIONS.find(
-        (o) => o.id === orgSlug || o.name.toLowerCase().includes(orgSlug.toLowerCase())
-      )
+      const org = findTrackingOrgBySlug(orgSlug)
       orgTablesList = org ? [org.tables] : getAllOrgTables()
     } else {
       orgTablesList = getAllOrgTables()
     }
 
-    const decodedEmail = decodeURIComponent(email)
+    const decodedEmail = email ? decodeURIComponent(email) : null
+    const decodedPhone = phone ? decodeURIComponent(phone) : null
+
+    // Normalize phone variants for matching (e.g. "19996022561" → also try "+5519996022561")
+    const phoneVariants: string[] = []
+    if (decodedPhone) {
+      phoneVariants.push(decodedPhone)
+      // If no country code, add +55 variant
+      if (!decodedPhone.startsWith('+')) {
+        phoneVariants.push(`+55${decodedPhone}`)
+      }
+      // If starts with +55, add without country code
+      if (decodedPhone.startsWith('+55')) {
+        phoneVariants.push(decodedPhone.slice(3))
+      }
+      // If starts with 55 (no +), add with + and without
+      if (decodedPhone.startsWith('55') && !decodedPhone.startsWith('+') && decodedPhone.length > 11) {
+        phoneVariants.push(`+${decodedPhone}`)
+        phoneVariants.push(decodedPhone.slice(2))
+      }
+    }
+
     const tracking = createTrackingClient()
 
-    // Query lead_journey views across all org tables
+    // Query lead_journey views across all org tables (by email or phone)
     const leadResults = await Promise.all(
       orgTablesList.map(async (tables) => {
-        const { data, error } = await tracking
-          .from(tables.leadJourney)
-          .select('*')
-          .eq('email', decodedEmail)
-          .limit(1)
-        if (error) {
-          console.error(`[Tracking API] Error querying ${tables.leadJourney}:`, error.message)
+        // Try email first
+        if (decodedEmail) {
+          const { data, error } = await tracking
+            .from(tables.leadJourney)
+            .select('*')
+            .eq('email', decodedEmail)
+            .limit(1)
+          if (error) {
+            console.error(`[Tracking API] Error querying ${tables.leadJourney}:`, error.message)
+          }
+          if (data && data.length > 0) return data
         }
-        return data || []
+        // Fallback: try phone variants
+        if (phoneVariants.length > 0) {
+          const { data, error } = await tracking
+            .from(tables.leadJourney)
+            .select('*')
+            .in('phone', phoneVariants)
+            .limit(1)
+          if (error) {
+            console.error(`[Tracking API] Error querying ${tables.leadJourney} by phone:`, error.message)
+          }
+          if (data && data.length > 0) return data
+        }
+        return []
       })
     )
     const lead = leadResults.flat()[0] || null
 
-    // Query events tables across all org tables
+    // Query events tables across all org tables (by email or phone)
     const eventResults = await Promise.all(
       orgTablesList.map(async (tables) => {
+        // Build OR filter for email + phone variants
+        const orFilters: string[] = []
+        if (decodedEmail) {
+          orFilters.push(`email.eq.${decodedEmail}`)
+        }
+        for (const pv of phoneVariants) {
+          orFilters.push(`phone.eq.${pv}`)
+        }
+
+        if (orFilters.length === 0) return []
+
         const { data, error } = await tracking
           .from(tables.events)
           .select('*')
-          .eq('email', decodedEmail)
+          .or(orFilters.join(','))
           .order('created_at', { ascending: true })
           .limit(500)
         if (error) {
@@ -80,7 +127,7 @@ export async function GET(req: NextRequest) {
       (a: any, b: any) => (a.created_at || '').localeCompare(b.created_at || '')
     )
 
-    console.log(`[Tracking API] email=${decodedEmail}, lead=${!!lead}, events=${events.length}, tables=${orgTablesList.map(t => t.events).join(',')}`)
+    console.log(`[Tracking API] email=${decodedEmail}, phone=${decodedPhone}, lead=${!!lead}, events=${events.length}, tables=${orgTablesList.map(t => t.events).join(',')}`)
 
     return NextResponse.json({ lead, events })
   } catch (error) {

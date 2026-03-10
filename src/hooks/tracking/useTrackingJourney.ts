@@ -11,7 +11,7 @@ interface UseTrackingJourneyReturn {
   error: string | null
 }
 
-export function useTrackingJourney(email: string, orgTablesList: OrgTables[], orgSlug?: string): UseTrackingJourneyReturn {
+export function useTrackingJourney(email: string, orgTablesList: OrgTables[], orgSlug?: string, phone?: string | null): UseTrackingJourneyReturn {
   const [lead, setLead] = useState<LeadJourney | null>(null)
   const [events, setEvents] = useState<TrackingEvent[]>([])
   const [loading, setLoading] = useState(true)
@@ -23,7 +23,9 @@ export function useTrackingJourney(email: string, orgTablesList: OrgTables[], or
       setError(null)
 
       try {
-        const params = new URLSearchParams({ email })
+        const params = new URLSearchParams()
+        if (email) params.set('email', email)
+        if (phone) params.set('phone', phone)
         if (orgSlug) params.set('orgSlug', orgSlug)
 
         const res = await fetch(`/api/tracking/journey?${params.toString()}`)
@@ -43,8 +45,8 @@ export function useTrackingJourney(email: string, orgTablesList: OrgTables[], or
       }
     }
 
-    if (email) fetchJourney()
-  }, [email, orgSlug])
+    if (email || phone) fetchJourney()
+  }, [email, phone, orgSlug])
 
   return { lead, events, loading, error }
 }
