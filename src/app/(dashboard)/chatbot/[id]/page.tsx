@@ -99,7 +99,7 @@ export default function ChatbotDetailPage({
   const [name, setName] = useState('')
   const [welcomeMessage, setWelcomeMessage] = useState('')
   const [aiEnabled, setAiEnabled] = useState(false)
-  const [aiModel, setAiModel] = useState('claude-haiku-4.5')
+  const [aiModel, setAiModel] = useState('anthropic/claude-haiku-4-5-20251001')
   const [aiSystemPrompt, setAiSystemPrompt] = useState('')
   const [widgetColor, setWidgetColor] = useState('#6366f1')
   const [widgetPosition, setWidgetPosition] = useState<'bottom-right' | 'bottom-left'>('bottom-right')
@@ -132,7 +132,7 @@ export default function ChatbotDetailPage({
       setName(configData.name)
       setWelcomeMessage(configData.welcome_message || '')
       setAiEnabled(configData.ai_enabled)
-      setAiModel(configData.ai_model || 'claude-haiku-4.5')
+      setAiModel(configData.ai_model || 'anthropic/claude-haiku-4-5-20251001')
       setAiSystemPrompt(configData.ai_system_prompt || '')
       setWidgetColor(configData.widget_color || '#6366f1')
       setWidgetPosition(configData.widget_position || 'bottom-right')
@@ -400,10 +400,10 @@ export default function ChatbotDetailPage({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="claude-haiku-4.5">
+                          <SelectItem value="anthropic/claude-haiku-4-5-20251001">
                             Claude Haiku (rapido)
                           </SelectItem>
-                          <SelectItem value="claude-sonnet-4-6">
+                          <SelectItem value="anthropic/claude-sonnet-4-20250514">
                             Claude Sonnet (avancado)
                           </SelectItem>
                         </SelectContent>

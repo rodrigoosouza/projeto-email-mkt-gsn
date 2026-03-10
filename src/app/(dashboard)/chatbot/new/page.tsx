@@ -35,7 +35,7 @@ export default function NewChatbotPage() {
   const [name, setName] = useState('')
   const [welcomeMessage, setWelcomeMessage] = useState('Ola! Como posso ajudar?')
   const [aiEnabled, setAiEnabled] = useState(false)
-  const [aiModel, setAiModel] = useState('claude-haiku-4.5')
+  const [aiModel, setAiModel] = useState('anthropic/claude-haiku-4-5-20251001')
   const [aiSystemPrompt, setAiSystemPrompt] = useState('')
   const [widgetColor, setWidgetColor] = useState('#6366f1')
   const [widgetPosition, setWidgetPosition] = useState<'bottom-right' | 'bottom-left'>('bottom-right')
@@ -152,10 +152,10 @@ export default function NewChatbotPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="claude-haiku-4.5">
+                      <SelectItem value="anthropic/claude-haiku-4-5-20251001">
                         Claude Haiku (rapido)
                       </SelectItem>
-                      <SelectItem value="claude-sonnet-4-6">
+                      <SelectItem value="anthropic/claude-sonnet-4-20250514">
                         Claude Sonnet (avancado)
                       </SelectItem>
                     </SelectContent>

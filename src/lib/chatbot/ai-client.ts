@@ -1,10 +1,21 @@
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || ''
 
+// Map legacy model names to OpenRouter format
+function resolveModel(model: string): string {
+  const MODEL_MAP: Record<string, string> = {
+    'claude-haiku-4.5': 'anthropic/claude-haiku-4-5-20251001',
+    'claude-haiku-4-5-20251001': 'anthropic/claude-haiku-4-5-20251001',
+    'claude-sonnet-4-6': 'anthropic/claude-sonnet-4-20250514',
+    'claude-sonnet-4': 'anthropic/claude-sonnet-4-20250514',
+  }
+  return MODEL_MAP[model] || (model.includes('/') ? model : `anthropic/${model}`)
+}
+
 export async function generateAIResponse(
   systemPrompt: string,
   conversationHistory: { role: string; content: string }[],
   userMessage: string,
-  model: string = 'anthropic/claude-haiku-4.5'
+  model: string = 'anthropic/claude-haiku-4-5-20251001'
 ): Promise<string> {
   if (!OPENROUTER_API_KEY) {
     console.log('[DEV] AI response mock for:', userMessage)
@@ -18,7 +29,7 @@ export async function generateAIResponse(
       'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
     },
     body: JSON.stringify({
-      model,
+      model: resolveModel(model),
       max_tokens: 500,
       messages: [
         {

@@ -130,7 +130,7 @@ export async function POST(
           chatbot.ai_system_prompt || '',
           conversationHistory,
           message,
-          chatbot.ai_model || 'claude-haiku-4.5'
+          chatbot.ai_model || 'anthropic/claude-haiku-4-5-20251001'
         )
       } catch (aiError) {
         console.error('Erro na resposta AI:', aiError)
