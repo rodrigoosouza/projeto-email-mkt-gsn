@@ -29,6 +29,7 @@ import {
   X,
   ClipboardList,
   Video,
+  Workflow,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -66,6 +67,7 @@ const navigation = [
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
   { name: 'Automacoes', href: '/automations', icon: Zap },
   { name: 'WhatsApp', href: '/whatsapp', icon: MessageCircle },
+  { name: 'Fluxos', href: '/whatsapp/flows', icon: Workflow },
   { name: 'SMS', href: '/sms', icon: Smartphone },
   { name: 'Formularios', href: '/forms', icon: FileInput },
   { name: 'Chatbot', href: '/chatbot', icon: Bot },
