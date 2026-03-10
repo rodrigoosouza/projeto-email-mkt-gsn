@@ -12,10 +12,12 @@ import {
   Globe,
   Settings,
   Loader2,
+  Wand2,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
+import { useToast } from '@/components/ui/use-toast'
 import { useOrganizationContext } from '@/contexts/organization-context'
 import { createClient } from '@/lib/supabase/client'
 
@@ -31,9 +33,11 @@ interface SetupItem {
 export function SetupChecklist() {
   const { currentOrg } = useOrganizationContext()
   const router = useRouter()
+  const { toast } = useToast()
   const [items, setItems] = useState<SetupItem[]>([])
   const [loading, setLoading] = useState(true)
   const [dismissed, setDismissed] = useState(false)
+  const [autoSetting, setAutoSetting] = useState(false)
 
   useEffect(() => {
     if (!currentOrg?.id) return
@@ -62,11 +66,11 @@ export function SetupChecklist() {
           .select('id', { count: 'exact', head: true })
           .eq('org_id', currentOrg!.id),
         supabase
-          .from('forms')
+          .from('lead_forms')
           .select('id', { count: 'exact', head: true })
           .eq('org_id', currentOrg!.id),
         supabase
-          .from('integration_configs')
+          .from('integrations')
           .select('id', { count: 'exact', head: true })
           .eq('org_id', currentOrg!.id),
       ])
@@ -154,6 +158,47 @@ export function SetupChecklist() {
     setDismissed(true)
   }
 
+  const hasStrategy = items.find((i) => i.key === 'strategy')?.completed
+  const hasPendingItems = items.some((i) => !i.completed && i.key !== 'briefing' && i.key !== 'strategy')
+
+  const handleAutoSetup = async () => {
+    if (!currentOrg?.id) return
+    setAutoSetting(true)
+    try {
+      const res = await fetch('/api/onboarding/auto-setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orgId: currentOrg.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Erro no auto-setup')
+
+      toast({
+        title: 'Setup automatico concluido!',
+        description: `Criados: ${data.created.form} formulario, ${data.created.templates} templates, ${data.created.campaign} campanha`,
+      })
+
+      // Re-check setup status
+      const supabase = createClient()
+      const [templatesRes, formsRes] = await Promise.all([
+        supabase.from('email_templates').select('id', { count: 'exact', head: true }).eq('org_id', currentOrg.id),
+        supabase.from('lead_forms').select('id', { count: 'exact', head: true }).eq('org_id', currentOrg.id),
+      ])
+      setItems((prev) =>
+        prev.map((item) => {
+          if (item.key === 'templates' && (templatesRes.count || 0) > 0) return { ...item, completed: true }
+          if (item.key === 'forms' && (formsRes.count || 0) > 0) return { ...item, completed: true }
+          return item
+        })
+      )
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Erro no auto-setup'
+      toast({ title: 'Erro', description: msg, variant: 'destructive' })
+    } finally {
+      setAutoSetting(false)
+    }
+  }
+
   return (
     <Card className="border-primary/20 bg-primary/5">
       <CardHeader className="pb-3">
@@ -208,9 +253,26 @@ export function SetupChecklist() {
           ))}
         </div>
 
-        {nextItem && (
+        {hasStrategy && hasPendingItems && (
           <Button
             className="w-full mt-4"
+            onClick={handleAutoSetup}
+            disabled={autoSetting}
+            variant="default"
+          >
+            {autoSetting ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Wand2 className="mr-2 h-4 w-4" />
+            )}
+            {autoSetting ? 'Configurando tudo com IA...' : 'Configurar tudo automaticamente com IA'}
+          </Button>
+        )}
+
+        {nextItem && !hasStrategy && (
+          <Button
+            className="w-full mt-4"
+            variant="outline"
             onClick={() => router.push(nextItem.href)}
           >
             <nextItem.icon className="mr-2 h-4 w-4" />
