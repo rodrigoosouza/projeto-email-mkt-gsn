@@ -1,342 +1,321 @@
-# Plano de Evolucao — Plataforma de Email Marketing
+# Plano de Evolucao — Plataforma de Marketing Automatizado
 
-> Documento consolidado com todos os bugs, melhorias e novas features.
+> Plano definitivo consolidado com TUDO discutido.
 > Atualizado em: 2026-03-09
+> Docs relacionados: VISAO-PRODUTO.md, METODO-HYESSER-ORGANICO.md, FLUXO-WHATSAPP-EVENTOS.md
 
 ---
 
-## 1. BUGS CRITICOS (Corrigir Primeiro)
+## STATUS: Bugs Corrigidos Nesta Sessao
 
-### 1.1 Bio Links — Pagina nao encontrada ❌
-- **Problema:** Ao criar um bio link, mostra "pagina nao encontrada"
-- **Causa provavel:** Rota publica para visualizar bio links inexistente ou quebrada
-- **Impacto:** Feature completamente inutilizavel
-- **Prioridade:** ALTA
-
-### 1.2 Segmentos — Nome duplicado (CORRIGIDO ✅)
-- Constraint `unique(org_id, name)` causava erro generico
-- Fix: mensagem clara + operador `not_equals` adicionado
-
-### 1.3 Templates — Save no editor visual (CORRIGIDO ✅)
-- Unlayer ref nao exportava HTML ao clicar salvar
-- Fix: fallback no ref do editor
-
-### 1.4 Forms embed — URL errada (CORRIGIDO ✅)
-- Embed usava `window.location.origin` em vez de `NEXT_PUBLIC_APP_URL`
-- Fix: usar env var
-
-### 1.5 Exportacao de Publicos — UUID invalido (CORRIGIDO ✅)
-- "Todos os leads" enviava string "all" para campo UUID
-- Fix: converter para null
-
-### 1.6 Chatbot — Modelos IA invalidos (CORRIGIDO ✅)
-- Nomes de modelos nao seguiam formato OpenRouter
-- Fix: mapeamento de nomes legados
+| # | Bug | Status |
+|---|-----|--------|
+| 1 | Chatbot — modelos IA invalidos para OpenRouter | ✅ CORRIGIDO |
+| 2 | Segmentos — nome duplicado + operador not_equals | ✅ CORRIGIDO |
+| 3 | Templates — save no editor visual Unlayer | ✅ CORRIGIDO |
+| 4 | Forms embed — URL base errada | ✅ CORRIGIDO |
+| 5 | Exportacao Publicos — "all" como UUID | ✅ CORRIGIDO |
+| 6 | Bio Links — URLs /bio/ corrigidas para /b/ | ✅ CORRIGIDO |
 
 ---
 
-## 2. FEATURES PARA REMOVER
+## AGUARDANDO DO USUARIO (COBRAR!)
 
-### 2.1 White Label
-- **Acao:** Remover tab de Settings e toda a logica associada
-- **Motivo:** Nao necessario neste momento
-
-### 2.2 Idioma
-- **Acao:** Remover tab de Settings
-- **Motivo:** Plataforma sera em portugues por padrao
+- [ ] **Estrutura de webinar** — fluxo/template de webinar que usa
+- [ ] **Estrutura de copy** — modulo de copywriting
+- [ ] **Ideias de criativos estaticos** — criacao de imagens para ads
 
 ---
 
-## 3. MELHORIAS EM FEATURES EXISTENTES
-
-### 3.1 Dashboard — Visao Completa da Empresa
-- **Problema atual:** Muito basico, poucos dados
-- **Objetivo:** Dashboard centralizado que mostra TUDO da empresa
-- **Deve incluir:**
-  - KPIs principais: leads totais, novos leads (periodo), taxa conversao
-  - Emails: enviados, abertos, clicados, bounced
-  - Campanhas ativas e performance
-  - Landing Pages: visitas, conversoes, taxa conversao
-  - Formularios: submissions, taxa preenchimento
-  - Redes Sociais: posts agendados, engajamento
-  - Videos: projetos em andamento
-  - Segmentos: tamanho dos segmentos principais
-  - Linha do tempo de atividades recentes
-- **Opcao:** Criar dashboards de marketing separados (sub-secao)
-- **Referencia:** Painel tipo RD Station / HubSpot
-
-### 3.2 SEO — Nivel Semrush
-- **Problema atual:** Muito basico
-- **Objetivo:** Ferramenta completa de SEO
-- **Deve incluir:**
-  - Audit de paginas (meta tags, heading structure, alt tags, etc.)
-  - Rastreamento de palavras-chave (posicao no Google)
-  - Analise de backlinks
-  - Analise de concorrentes
-  - Sugestoes de otimizacao por IA
-  - Score de SEO por pagina
-  - Monitoramento de Core Web Vitals
-  - Sitemap e robots.txt generator
-  - Integracao com Google Search Console
-- **Referencia:** Semrush, Ahrefs, Ubersuggest
-
-### 3.3 Integracoes — UX para Cliente Terceiro
-- **Problema atual:** Muito tecnico, dificil para cliente preencher
-- **Objetivo:** Wizard guiado para cada integracao
-- **Deve incluir:**
-  - Passo-a-passo visual para cada servico
-  - Validacao de credenciais em tempo real
-  - Status de conexao (conectado/desconectado/erro)
-  - Botoes "Conectar" estilo OAuth quando possivel
-  - Help text claro explicando onde encontrar cada credencial
-  - Screenshots/links diretos para paineis dos servicos
-- **Integracoes prioritarias:**
-  - MailerSend (email)
-  - Meta Ads (publicos)
-  - Google Ads (publicos)
-  - Google Analytics (tracking)
-  - Google Search Console (SEO)
-  - Cloudflare (dominios)
-  - Vercel (deploys)
-
-### 3.4 Redes Sociais — Automacao de Postagem
-- **Problema atual:** Basico, sem automacao
-- **Objetivo:** Agendar e postar automaticamente em cada perfil
-- **Deve incluir:**
-  - Conectar perfis (Instagram, Facebook, LinkedIn, Twitter/X, TikTok)
-  - Calendario de conteudo visual (mensal/semanal)
-  - Agendamento de posts
-  - Criacao de conteudo com IA:
-    - Carrosseis (series de imagens)
-    - Posts estaticos (imagem + legenda)
-    - Videos curtos (Reels/TikTok)
-    - Stories
-  - Aprovacao de conteudo antes de postar
-  - Analytics por rede e por post
-  - Integracao com estrategia de marketing (ICP/persona)
-- **Automacao:** n8n para disparar posts nos horarios agendados
-- **Referencia:** mLabs, Hootsuite, Buffer
-
-### 3.5 Organizacao — Contexto Completo por Org
-- **Objetivo:** Cada organizacao tem seu proprio universo
-- **Deve incluir:**
-  - Briefing completo (ja existe no modulo Marketing)
-  - ICP e Personas (ja existe)
-  - Brand Identity (ja existe)
-  - Tom de voz e diretrizes de comunicacao
-  - Chatbot adapta respostas ao contexto da org
-  - Conteudo gerado pela IA usa o contexto da org
-  - Dashboard personalizado por org
-- **Importante:** Ja temos `marketing_profiles` com estrategia completa. Precisamos garantir que TODOS os modulos usem esse contexto.
+## PLANO DE EXECUCAO (12 Fases)
 
 ---
 
-## 4. NOVAS FEATURES
+### FASE 1 — Limpeza & Fundacao (1 dia)
+> Remover o que nao precisa + garantir base solida
 
-### 4.1 Mapa de Calor (tipo Clarity)
-- **Objetivo:** Tracking visual de comportamento em LPs
-- **Deve incluir:**
-  - Heatmap de cliques
-  - Scroll depth
-  - Gravacao de sessoes (replay)
-  - Tempo medio por secao
-  - Funil de conversao visual
-- **Implementacao:**
-  - Script JS leve embeddado nas LPs
-  - Coleta de eventos (click, scroll, mousemove)
-  - Armazena no Supabase (tabela `heatmap_events`)
-  - Dashboard de visualizacao com canvas/overlay
-- **Referencia:** Microsoft Clarity, Hotjar
+- [ ] **1.1** Remover tab White Label do Settings
+- [ ] **1.2** Remover tab Idioma do Settings
+- [ ] **1.3** Verificar `NEXT_PUBLIC_APP_URL` na Vercel
+- [ ] **1.4** Testar todos os 6 fixes deployados
+- [ ] **1.5** Rodar pente fino geral nos modulos restantes
 
-### 4.2 Calendario de Conteudo + Criacao com IA
-- **Objetivo:** Planejar e criar conteudo organico integrado a estrategia
-- **Fluxo:**
-  1. Na secao Marketing, apos criar estrategia/ICP
-  2. IA sugere calendario de conteudo (30 dias)
-  3. Para cada dia: tipo de post, tema, copy, hashtags
-  4. Gerar criativos automaticamente:
-     - Carrosseis (imagens sequenciais)
-     - Posts estaticos (Nano Banana)
-     - Videos curtos (Veo quando disponivel)
-  5. Aprovar → Agendar → Postar automaticamente
-- **Integracao:** Usa contexto da org (ICP, persona, tom de voz)
-- **Usuario pode:** Anexar arquivo com ideias de conteudo
-
-### 4.3 Chatbot — Instalacao + Contexto por Org
-- **Melhorias:**
-  - Tab "Instalacao" com embed code + instrucoes passo-a-passo
-  - Opcao de instalar automaticamente nas LPs da org
-  - System prompt alimentado pelo briefing/ICP da org
-  - Widget preview antes de instalar
-  - Analytics de conversas
-
-### 4.4 Tracking — Separar por Organizacao
-- **Problema atual:** Dados de tracking misturados entre orgs
-- **Solucao:**
-  - Filtrar dashboards/relatorios por org_id
-  - Jornada do lead mostra TODAS as paginas visitadas (cross-org)
-  - Script de tracking identifica a org de origem
-  - Cada org ve so seus dados, mas lead mostra tudo
-
-### 4.5 Landing Pages — Deploy Independente
-- **Hoje:** Deploy como arquivo unico no Vercel (projeto principal)
-- **Objetivo:**
-  - Cada LP = projeto separado na Vercel
-  - Futuro: subdominio por org via Cloudflare
-    - Ex: `templum.rodriguinhodomarketing.com.br/lp-nome`
-    - Ex: `evolutto.rodriguinhodomarketing.com.br/lp-nome`
-  - DNS gerenciado via API Cloudflare
-  - SSL automatico via Cloudflare
-
-### 4.6 Copy (FUTURO)
-- **Status:** Usuario vai trazer estrutura propria em breve
-- **Conceito:** Modulo de copywriting com IA
-- **Aguardando:** Estrutura/arquivo do usuario
-
-### 4.7 Criativos Estaticos (FUTURO)
-- **Status:** Usuario vai trazer ideias em breve
-- **Conceito:** Criacao de imagens para ads e social
-- **Aguardando:** Ideias/estrutura do usuario
+**Arquivos:** `src/app/(dashboard)/settings/page.tsx`, componentes White Label e Idioma
 
 ---
 
-## 5. REORGANIZACAO DA SIDEBAR
+### FASE 2 — Contexto por Organizacao (2-3 dias)
+> Cada org e um universo. Tudo alimentado pelo briefing.
 
-### Proposta: Agrupar por Categoria
+- [ ] **2.1** Garantir que `marketing_profiles` (briefing/ICP/persona) e carregado em todos os modulos
+- [ ] **2.2** Criar helper `getOrgContext(orgId)` — retorna briefing + ICP + persona + tom de voz
+- [ ] **2.3** Chatbot: system prompt alimentado automaticamente pelo briefing da org
+- [ ] **2.4** LP Builder: contexto da org pre-carregado na IA
+- [ ] **2.5** Tracking: filtrar dados por org_id (dashboards separados)
+- [ ] **2.6** Tracking: jornada do lead mostra TODAS paginas visitadas (cross-org)
+
+**Tabelas:** Ajustar queries de tracking para filtrar por org, manter jornada cross-org
+**Referencia:** O briefing ja existe em `marketing_profiles`. Precisamos plugar nos modulos.
+
+---
+
+### FASE 3 — Onboarding Automatico (3-4 dias)
+> Cliente preenche briefing → IA gera TUDO
+
+- [ ] **3.1** Fluxo: Criar Org → Redireciona para Briefing (obrigatorio)
+- [ ] **3.2** Ao finalizar briefing, IA gera automaticamente:
+  - [ ] Estrategia de marketing completa (ja existe)
+  - [ ] Landing Page principal (LP Builder com contexto)
+  - [ ] 3 templates de email (boas-vindas, nutricao, conversao)
+  - [ ] Sequencia de emails sugerida
+  - [ ] Mensagens WhatsApp sugeridas
+- [ ] **3.3** Tela de "Setup Completo" mostrando tudo que foi gerado
+- [ ] **3.4** Checklist pos-setup: o que falta configurar (dominio, integrações, etc.)
+
+**Dependencia:** Fase 2 (contexto por org precisa existir)
+
+---
+
+### FASE 4 — Dashboard Completo + Plano de Acao IA (2-3 dias)
+> Visao 360 de tudo + IA sugere acoes
+
+- [ ] **4.1** Redesign dashboard com KPIs de todos os modulos:
+  - Leads (total, novos, por fonte)
+  - Email (enviados, abertos, clicados, bounced)
+  - Campanhas (ativas, performance)
+  - Landing Pages (visitas, conversoes, taxa)
+  - Formularios (submissions, taxa)
+  - Redes Sociais (posts, engajamento)
+  - Videos (projetos em andamento)
+- [ ] **4.2** Linha do tempo de atividades recentes
+- [ ] **4.3** Graficos de tendencia (periodo selecionavel)
+- [ ] **4.4** **Plano de Acao IA:** Analisa dados e sugere acoes
+  - "Taxa de abertura caiu 15% — testar novo subject line"
+  - "LP com bounce rate alto — revisar headline"
+  - "Lead scoring medio subiu — ativar campanha conversao"
+
+**Referencia:** RD Station, HubSpot
+
+---
+
+### FASE 5 — Flow Builder WhatsApp (4-5 dias)
+> Substituir ManyChat por completo
+
+- [ ] **5.1** Editor visual drag-and-drop de fluxos
+  - Blocos: Mensagem, Condicao, Smart Delay, Acao, Webhook
+  - Conexoes visuais (edges) entre blocos
+  - Preview de mensagem
+- [ ] **5.2** Sistema de Tags por lead
+  - CRUD de tags
+  - Auto-tag por acao (clique botao, abriu msg)
+  - Filtros por tag nos segmentos
+  - Padrao nomenclatura: `[acao]_[tipo_evento]_[marca]`
+- [ ] **5.3** Smart Delay com data/hora especifica
+  - Wait Until (data/hora fixa com fuso)
+  - Wait For (intervalo relativo)
+- [ ] **5.4** Condicoes com ramificacao
+  - Verificar tags (tem/nao tem)
+  - Verificar campo do lead
+  - Logica AND/OR
+  - Caminho Verde (match) / Vermelho (no match)
+- [ ] **5.5** Templates de fluxo pre-montados:
+  - Webinar/Evento (4 fases, 11 msgs — doc Hyesser)
+  - Boas-vindas
+  - Nutricao por scoring
+  - Pos-compra
+- [ ] **5.6** Analytics de fluxo
+  - Taxa entrega por msg
+  - CTR botoes
+  - Funil conversao por fase
+  - Quem parou em qual etapa
+- [ ] **5.7** Integracao webhook n8n para acoes externas
+
+**Tabelas novas:** `automation_flows`, `automation_executions`, `lead_tags`
+**Referencia:** docs/FLUXO-WHATSAPP-EVENTOS.md (padrao ManyChat completo)
+
+---
+
+### FASE 6 — Calendario de Conteudo + Metodo Hyesser (3-4 dias)
+> Criacao de conteudo organico com IA seguindo os 4 pilares
+
+- [ ] **6.1** Pagina de Calendario visual (mensal/semanal)
+- [ ] **6.2** IA gera 30 dias de conteudo baseado em:
+  - Briefing/ICP da org
+  - Metodo Hyesser (4 pilares: Crescimento 44%, Conexao 22%, Quebra Objecoes 22%, Autoridade 12%)
+- [ ] **6.3** Para cada post, IA gera:
+  - Pilar + tipo + formato (reels, carrossel, post, stories)
+  - Legenda/copy completa com hashtags e CTA
+  - Prompt de imagem (para Nano Banana)
+  - Horario sugerido
+- [ ] **6.4** Geracao de criativos com IA
+  - Imagens estaticas (Nano Banana via OpenRouter)
+  - Carrosseis (sequencia de imagens)
+  - Videos curtos (quando Veo disponivel)
+- [ ] **6.5** Fluxo: Aprovar → Agendar → Postar automaticamente (n8n)
+- [ ] **6.6** Analytics por post (engajamento, alcance)
+
+**Tabela nova:** `content_calendar`
+**Referencia:** docs/METODO-HYESSER-ORGANICO.md
+
+---
+
+### FASE 7 — Landing Pages: Deploy Independente (2-3 dias)
+> Cada LP como projeto separado + subdominios futuros
+
+- [ ] **7.1** Deploy cada LP como projeto separado na Vercel (API Deployments)
+- [ ] **7.2** GTM auto-configurado na LP (Meta Pixel, Google Ads, GA4)
+- [ ] **7.3** Chatbot da org integrado automaticamente nas LPs
+- [ ] **7.4** Formulario da org embeddado na LP
+- [ ] **7.5** Preparar infra para subdominios via Cloudflare API
+  - `org.dominio.com.br/lp-nome`
+  - DNS programatico
+  - SSL automatico
+
+**Dependencia:** Fase 2 (contexto org) + CLOUDFLARE_API_TOKEN
+
+---
+
+### FASE 8 — Integracoes UX (2 dias)
+> Wizard guiado para cliente terceiro preencher
+
+- [ ] **8.1** Redesign da pagina de integracoes
+- [ ] **8.2** Card por servico com status (conectado/erro/nao configurado)
+- [ ] **8.3** Wizard passo-a-passo com screenshots
+- [ ] **8.4** Validacao de credenciais em tempo real (teste API key)
+- [ ] **8.5** Servicos prioritarios:
+  - MailerSend, Meta Ads, Google Ads, Google Analytics
+  - Google Search Console, Cloudflare, Vercel, WhatsApp Business
+
+---
+
+### FASE 9 — SEO Avancado (3-5 dias)
+> Nivel Semrush
+
+- [ ] **9.1** Audit de paginas (meta tags, headings, alt, schema)
+- [ ] **9.2** Rastreamento de palavras-chave (posicao Google)
+- [ ] **9.3** Score de SEO por pagina (0-100)
+- [ ] **9.4** Sugestoes de otimizacao por IA
+- [ ] **9.5** Integracao Google Search Console (impressoes, cliques, CTR)
+- [ ] **9.6** Analise de concorrentes (dominio vs dominio)
+- [ ] **9.7** Core Web Vitals monitoring
+- [ ] **9.8** Sitemap + robots.txt generator
+
+**Referencia:** Semrush, Ahrefs
+
+---
+
+### FASE 10 — Mapa de Calor (3-4 dias)
+> Tipo Clarity/Hotjar
+
+- [ ] **10.1** Script JS leve para embeddar nas LPs
+  - Captura: clicks, scroll depth, mouse movement, tempo por secao
+- [ ] **10.2** Dashboard de heatmap (overlay visual sobre a LP)
+- [ ] **10.3** Gravacao de sessoes (session replay)
+- [ ] **10.4** Funil de conversao visual
+- [ ] **10.5** Segmentacao por dispositivo (mobile vs desktop)
+- [ ] **10.6** Integracao automatica nas LPs deployadas
+
+**Tabelas novas:** `heatmap_events`, `heatmap_sessions`
+**Referencia:** Microsoft Clarity, Hotjar
+
+---
+
+### FASE 11 — Reorganizacao Sidebar + UX (1-2 dias)
+> Agrupar modulos em categorias logicas
 
 ```
-📊 Dashboard (visao geral)
+Dashboard
 
-📈 Marketing
-   ├─ Estrategia (briefing, ICP, persona)
-   ├─ Calendario de Conteudo
-   └─ Copy (futuro)
+Marketing
+  ├ Estrategia
+  ├ Calendario de Conteudo
+  └ Copy (futuro)
 
-👥 Leads & Segmentos
-   ├─ Leads
-   ├─ Segmentos
-   └─ Formularios
+Leads & Segmentos
+  ├ Leads
+  ├ Segmentos
+  └ Formularios
 
-📧 Email Marketing
-   ├─ Campanhas
-   ├─ Templates
-   └─ Automacoes
+Email Marketing
+  ├ Campanhas
+  ├ Templates
+  └ Automacoes Email
 
-📱 Redes Sociais
-   ├─ Posts & Agendamento
-   ├─ Bio Links
-   └─ Analytics Social
+Mensageria
+  ├ WhatsApp (fluxos + broadcasts)
+  ├ SMS
+  └ Chatbot
 
-🎬 Criativos
-   ├─ Videos (Ad Director)
-   ├─ Imagens (futuro)
-   └─ Carrosseis (futuro)
+Redes Sociais
+  ├ Posts & Agendamento
+  ├ Bio Links
+  └ Analytics Social
 
-🌐 Web
-   ├─ Landing Pages
-   ├─ SEO
-   ├─ Tracking & Heatmap
-   └─ Chatbot
+Criativos
+  ├ Videos (Ad Director)
+  ├ Imagens (futuro)
+  └ Carrosseis (futuro)
 
-📤 Exportacoes
-   ├─ Publicos (Meta/Google Ads)
-   └─ Relatorios
+Web
+  ├ Landing Pages
+  ├ SEO
+  └ Tracking & Heatmap
 
-⚙️ Configuracoes
-   ├─ Organizacao
-   ├─ Membros
-   ├─ API Keys
-   ├─ Dominio de Email
-   ├─ Campos Personalizados
-   ├─ Lead Scoring
-   ├─ Integracoes
-   └─ Aparencia
+Exportacoes
+  ├ Publicos (Meta/Google Ads)
+  └ Relatorios
+
+Configuracoes
+  ├ Organizacao + Membros
+  ├ Integracoes
+  ├ Dominio + API Keys
+  ├ Campos + Scoring
+  └ Aparencia
 ```
 
-**Removidos:** White Label, Idioma
-**Nota:** WhatsApp e SMS podem ficar dentro de "Automacoes" ou como grupo separado "Mensageria"
+---
+
+### FASE 12 — Copy & Criativos Estaticos (AGUARDANDO)
+> Depende de materiais do usuario
+
+- [ ] **12.1** Modulo de Copy com IA (aguardando estrutura)
+- [ ] **12.2** Criativos estaticos com IA (aguardando ideias)
+- [ ] **12.3** Estrutura de webinar completa (aguardando template)
 
 ---
 
-## 6. ORDEM DE EXECUCAO SUGERIDA
+## RESUMO TIMELINE
 
-### Fase 1 — Bugs & Limpeza (1-2 dias)
-- [ ] Fix Bio Links (pagina nao encontrada)
-- [ ] Remover White Label e Idioma do Settings
-- [ ] Verificar NEXT_PUBLIC_APP_URL na Vercel
-- [ ] Testar todos os fixes ja deployados
+| Fase | Nome | Dias | Dependencias |
+|------|------|------|-------------|
+| 1 | Limpeza & Fundacao | 1 | Nenhuma |
+| 2 | Contexto por Org | 2-3 | — |
+| 3 | Onboarding Automatico | 3-4 | Fase 2 |
+| 4 | Dashboard + Plano IA | 2-3 | Fase 2 |
+| 5 | Flow Builder WhatsApp | 4-5 | Fase 2 |
+| 6 | Calendario Hyesser | 3-4 | Fase 2 |
+| 7 | LP Deploy Independente | 2-3 | Fase 2 |
+| 8 | Integracoes UX | 2 | — |
+| 9 | SEO Avancado | 3-5 | — |
+| 10 | Mapa de Calor | 3-4 | Fase 7 |
+| 11 | Sidebar + UX | 1-2 | Apos maioria |
+| 12 | Copy & Criativos | TBD | Materiais usuario |
 
-### Fase 2 — Organizacao por Org (2-3 dias)
-- [ ] Tracking separado por org
-- [ ] Chatbot com contexto da org
-- [ ] Garantir que todos os modulos usam org context
-
-### Fase 3 — Dashboard Completo (2-3 dias)
-- [ ] Redesign do dashboard com todos os KPIs
-- [ ] Cards por modulo com metricas
-- [ ] Linha do tempo de atividades
-
-### Fase 4 — Integracoes UX (1-2 dias)
-- [ ] Wizard guiado para cada integracao
-- [ ] Validacao de credenciais
-- [ ] Status de conexao visual
-
-### Fase 5 — Landing Pages + Deploy (2-3 dias)
-- [ ] Deploy como projeto separado na Vercel
-- [ ] Chatbot integrado nas LPs
-- [ ] Preparacao para subdominios Cloudflare
-
-### Fase 6 — Redes Sociais + Calendario (3-5 dias)
-- [ ] Conectar perfis de redes sociais
-- [ ] Calendario de conteudo visual
-- [ ] Criacao de posts com IA (texto + imagem)
-- [ ] Agendamento via n8n
-
-### Fase 7 — SEO Avancado (3-5 dias)
-- [ ] Audit de paginas
-- [ ] Tracking de keywords
-- [ ] Integracao Google Search Console
-- [ ] Sugestoes de otimizacao por IA
-
-### Fase 8 — Mapa de Calor (3-5 dias)
-- [ ] Script de coleta de eventos
-- [ ] Dashboard de heatmap
-- [ ] Gravacao/replay de sessoes
-- [ ] Integracao com LPs
-
-### Fase 9 — Sidebar + UX (1-2 dias)
-- [ ] Reorganizar navegacao em categorias
-- [ ] Submenus colapsaveis
-- [ ] Quick actions / search
-
-### Fase 10 — Copy & Criativos (AGUARDANDO)
-- [ ] Modulo de Copy (aguardando estrutura do usuario)
-- [ ] Criativos Estaticos (aguardando ideias do usuario)
+**Paralelo possivel:** Fases 3+4+5+6+7 podem rodar em paralelo apos Fase 2
+**Total estimado:** ~30-40 dias de desenvolvimento
 
 ---
 
-## 7. NOTAS TECNICAS
+## DOCUMENTACAO COMPLETA
 
-### Variaveis de Ambiente Necessarias
-| Variavel | Servico | Status |
-|----------|---------|--------|
-| NEXT_PUBLIC_APP_URL | Vercel/App | Verificar na Vercel |
-| OPENROUTER_API_KEY | IA (cenas, imagens, chatbot) | ✅ Configurado |
-| GOOGLE_GEMINI_API_KEY | Videos (Veo 3) | ⚠️ Precisa billing |
-| MAILERSEND_API_KEY | Emails | ✅ Configurado |
-| VERCEL_ACCESS_TOKEN | Deploy LPs | ✅ Configurado |
-| CLOUDFLARE_API_TOKEN | DNS (futuro) | ❌ Nao configurado |
-| META_ADS_TOKEN | Exportacao publicos (futuro) | ❌ Nao configurado |
-| GOOGLE_ADS_TOKEN | Exportacao publicos (futuro) | ❌ Nao configurado |
-
-### Tabelas Novas Necessarias
-- `heatmap_events` — clicks, scrolls, mouse para mapa de calor
-- `heatmap_sessions` — sessoes de gravacao
-- `content_calendar` — calendario de conteudo
-- `social_scheduled_posts` — posts agendados
-- `social_connections` — OAuth tokens por rede social
-- Ajustes em: `tracking events` (add org_id filter), `bio_link_pages` (fix rota)
+| Documento | Conteudo |
+|-----------|----------|
+| `docs/VISAO-PRODUTO.md` | Visao macro, ferramentas substituidas, fluxo ideal, roadmap OpenClaw |
+| `docs/METODO-HYESSER-ORGANICO.md` | 4 pilares, calendario, tipos conteudo, schema DB |
+| `docs/FLUXO-WHATSAPP-EVENTOS.md` | 4 fases, 11 msgs, tags, smart delays, schema DB |
+| `docs/PLANO-EVOLUCAO-PLATAFORMA.md` | Este documento — plano de execucao completo |
+| `docs/VIDEO-MODULE-BEST-PRACTICES.md` | Modulo videos, bugs corrigidos, boas praticas |
 
 ---
 
-*Documento gerado e mantido pelo Claude Code. Atualizar conforme evolucao do projeto.*
+*Plano definitivo. Atualizar conforme evolucao. Proximo passo: usuario confirma prioridade e comecamos pela Fase 1.*
