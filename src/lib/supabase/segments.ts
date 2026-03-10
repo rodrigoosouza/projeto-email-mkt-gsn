@@ -208,6 +208,9 @@ export function applyRulesToQuery(query: any, rules: any[]): any {
       case 'equals':
         query = query.eq(field, value)
         break
+      case 'not_equals':
+        query = query.neq(field, value)
+        break
       case 'contains':
         query = query.ilike(field, `%${value}%`)
         break

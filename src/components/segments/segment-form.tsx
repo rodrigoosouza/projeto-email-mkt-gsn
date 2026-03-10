@@ -122,11 +122,16 @@ export function SegmentForm({ segment }: SegmentFormProps) {
         toast({ title: 'Segmento criado', description: 'O segmento foi criado com sucesso.' })
         router.push(`/segments/${created.id}`)
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao salvar segmento:', error)
+      const message = error?.message || ''
+      let description = 'Nao foi possivel salvar o segmento.'
+      if (message.includes('unique') || message.includes('duplicate') || message.includes('segments_org_id_name_key')) {
+        description = 'Ja existe um segmento com esse nome. Escolha outro nome.'
+      }
       toast({
         title: 'Erro',
-        description: 'Nao foi possivel salvar o segmento.',
+        description,
         variant: 'destructive',
       })
     }

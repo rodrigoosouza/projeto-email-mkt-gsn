@@ -157,9 +157,14 @@ export function TemplateForm({ template }: TemplateFormProps) {
         }
         setUnlayerJson(json)
         router.push('/templates')
-      } catch (error) {
+      } catch (error: any) {
         console.error('Erro ao salvar template:', error)
-        toast({ title: 'Erro', description: 'Nao foi possivel salvar o template.', variant: 'destructive' })
+        const message = error?.message || ''
+        let description = 'Nao foi possivel salvar o template.'
+        if (message.includes('unique') || message.includes('duplicate') || message.includes('email_templates_org_id_name_key')) {
+          description = 'Ja existe um template com esse nome. Escolha outro nome.'
+        }
+        toast({ title: 'Erro', description, variant: 'destructive' })
       } finally {
         setSavingUnlayer(false)
       }
@@ -211,9 +216,14 @@ export function TemplateForm({ template }: TemplateFormProps) {
         toast({ title: 'Template criado', description: 'O template foi criado com sucesso.' })
       }
       router.push('/templates')
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao salvar template:', error)
-      toast({ title: 'Erro', description: 'Nao foi possivel salvar o template.', variant: 'destructive' })
+      const message = error?.message || ''
+      let description = 'Nao foi possivel salvar o template.'
+      if (message.includes('unique') || message.includes('duplicate') || message.includes('email_templates_org_id_name_key')) {
+        description = 'Ja existe um template com esse nome. Escolha outro nome.'
+      }
+      toast({ title: 'Erro', description, variant: 'destructive' })
     }
   }
 

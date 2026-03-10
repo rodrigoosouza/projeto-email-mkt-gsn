@@ -53,9 +53,22 @@ export function UnlayerEditor({ initialJson, onSave, saving }: UnlayerEditorProp
   }, [initialJson])
 
   const handleSave = useCallback(() => {
-    if (!emailEditorRef.current?.editor) return
+    const editor = emailEditorRef.current?.editor
+    if (!editor) {
+      // Fallback: try accessing via ref's exportHtml directly
+      if (emailEditorRef.current?.exportHtml) {
+        emailEditorRef.current.exportHtml(
+          (data: { design: any; html: string }) => {
+            onSave(data.html, data.design)
+          }
+        )
+        return
+      }
+      console.error('Editor ref not available')
+      return
+    }
 
-    emailEditorRef.current.editor.exportHtml(
+    editor.exportHtml(
       (data: { design: any; html: string }) => {
         onSave(data.html, data.design)
       }

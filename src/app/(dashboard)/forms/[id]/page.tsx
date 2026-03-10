@@ -127,7 +127,7 @@ export default function FormDetailPage() {
 
   function getEmbedCode() {
     if (!form) return { script: '', inline: '' }
-    const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')
     return {
       script: `<script src="${baseUrl}/api/forms/${form.id}/embed.js" async></script>`,
       inline: `<div id="plataforma-form-${form.id}"></div>\n<script src="${baseUrl}/api/forms/${form.id}/embed.js" async></script>`,
