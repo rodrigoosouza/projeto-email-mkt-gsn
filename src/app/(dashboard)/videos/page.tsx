@@ -75,7 +75,11 @@ export default function VideosPage() {
 
   async function handleDelete(id: string) {
     const supabase = createClient()
-    await supabase.from('video_projects').delete().eq('id', id)
+    const { error } = await supabase.from('video_projects').delete().eq('id', id)
+    if (error) {
+      toast({ title: 'Erro ao excluir projeto', variant: 'destructive' })
+      return
+    }
     setProjects((prev) => prev.filter((p) => p.id !== id))
     toast({ title: 'Projeto excluido' })
   }

@@ -51,8 +51,8 @@ interface VideoScene {
   image_prompt: string | null
   video_prompt: string | null
   status: string
-  image_urls: string[]
-  video_urls: string[]
+  image_urls: string[] | null
+  video_urls: string[] | null
 }
 
 const PHASE_LABELS: Record<string, string> = {
@@ -103,7 +103,6 @@ export default function VideoProjectDetailPage() {
   const [generatingSceneVideo, setGeneratingSceneVideo] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
-    setLoading(true)
     const supabase = createClient()
 
     const [{ data: proj }, { data: scns }] = await Promise.all([
@@ -124,7 +123,7 @@ export default function VideoProjectDetailPage() {
     fetchData()
   }, [fetchData])
 
-  // Poll for updates when generating
+  // Poll for updates when generating (every 10s)
   useEffect(() => {
     if (!generatingAssets && !generatingSceneImage && !generatingSceneVideo) return
     const interval = setInterval(async () => {
@@ -135,29 +134,40 @@ export default function VideoProjectDetailPage() {
         .eq('project_id', projectId)
         .order('scene_index', { ascending: true })
       if (scns) setScenes(scns as VideoScene[])
-    }, 5000)
+    }, 10000)
     return () => clearInterval(interval)
   }, [generatingAssets, generatingSceneImage, generatingSceneVideo, projectId])
 
   async function updateSceneStatus(sceneId: string, status: 'approved' | 'rejected') {
     const supabase = createClient()
-    await supabase.from('video_scenes').update({ status }).eq('id', sceneId)
-    setScenes((prev) =>
-      prev.map((s) => (s.id === sceneId ? { ...s, status } : s))
-    )
+    const { error } = await supabase.from('video_scenes').update({ status }).eq('id', sceneId)
+
+    if (error) {
+      toast({ title: 'Erro ao atualizar status', variant: 'destructive' })
+      return
+    }
+
+    // Use functional update to get fresh state
+    setScenes((prev) => {
+      const updated = prev.map((s) => (s.id === sceneId ? { ...s, status } : s))
+
+      // Check if all scenes are approved
+      if (updated.every((s) => s.status === 'approved')) {
+        supabase
+          .from('video_projects')
+          .update({ status: 'approved' })
+          .eq('id', projectId)
+          .then(() => {
+            setProject((p) => p ? { ...p, status: 'approved' } : null)
+            toast({ title: 'Projeto aprovado!', description: 'Todas as cenas foram aprovadas.' })
+          })
+      }
+
+      return updated
+    })
 
     const label = status === 'approved' ? 'aprovada' : 'reprovada'
     toast({ title: `Cena ${label}` })
-
-    const updated = scenes.map((s) => (s.id === sceneId ? { ...s, status } : s))
-    if (updated.every((s) => s.status === 'approved')) {
-      await supabase
-        .from('video_projects')
-        .update({ status: 'approved' })
-        .eq('id', projectId)
-      setProject((prev) => prev ? { ...prev, status: 'approved' } : null)
-      toast({ title: 'Projeto aprovado!', description: 'Todas as cenas foram aprovadas.' })
-    }
   }
 
   async function approveAll() {
@@ -165,17 +175,22 @@ export default function VideoProjectDetailPage() {
     const ids = scenes.filter((s) => s.status !== 'approved').map((s) => s.id)
     if (ids.length === 0) return
 
-    await supabase.from('video_scenes').update({ status: 'approved' }).in('id', ids)
-    await supabase.from('video_projects').update({ status: 'approved' }).eq('id', projectId)
+    const { error: e1 } = await supabase.from('video_scenes').update({ status: 'approved' }).in('id', ids)
+    const { error: e2 } = await supabase.from('video_projects').update({ status: 'approved' }).eq('id', projectId)
+
+    if (e1 || e2) {
+      toast({ title: 'Erro ao aprovar', variant: 'destructive' })
+      return
+    }
 
     setScenes((prev) => prev.map((s) => ({ ...s, status: 'approved' })))
     setProject((prev) => prev ? { ...prev, status: 'approved' } : null)
     toast({ title: 'Todas as cenas aprovadas!' })
   }
 
-  async function regenerateScene(sceneId: string) {
+  async function regenerateAllScenes() {
     if (!project?.script_input) return
-    setRegeneratingId(sceneId)
+    setRegeneratingId('all')
 
     try {
       const res = await fetch('/api/videos/generate-scenes', {
@@ -193,6 +208,9 @@ export default function VideoProjectDetailPage() {
       if (res.ok) {
         await fetchData()
         toast({ title: 'Cenas regeneradas' })
+      } else {
+        const err = await res.json().catch(() => null)
+        toast({ title: err?.error || 'Erro ao regenerar', variant: 'destructive' })
       }
     } catch {
       toast({ title: 'Erro ao regenerar', variant: 'destructive' })
@@ -203,7 +221,7 @@ export default function VideoProjectDetailPage() {
 
   async function generateAllAssets() {
     setGeneratingAssets(true)
-    toast({ title: 'Gerando imagens e videos...', description: 'Isso pode levar alguns minutos.' })
+    toast({ title: 'Gerando imagens...', description: 'Isso pode levar alguns minutos.' })
 
     try {
       const res = await fetch('/api/videos/generate-assets', {
@@ -212,16 +230,19 @@ export default function VideoProjectDetailPage() {
         body: JSON.stringify({ projectId }),
       })
 
+      const data = await res.json().catch(() => null)
+
       if (res.ok) {
-        const data = await res.json()
         await fetchData()
+        const errors = data?.results?.filter((r: Record<string, unknown>) => r.error)?.length || 0
         toast({
           title: 'Assets gerados!',
-          description: `${data.processed} cenas processadas.`,
+          description: errors > 0
+            ? `${data.processed} cenas processadas, ${errors} com erro.`
+            : `${data.processed} cenas processadas.`,
         })
       } else {
-        const err = await res.json().catch(() => null)
-        toast({ title: err?.error || 'Erro ao gerar assets', variant: 'destructive' })
+        toast({ title: data?.error || 'Erro ao gerar assets', variant: 'destructive' })
       }
     } catch {
       toast({ title: 'Erro ao gerar assets', variant: 'destructive' })
@@ -239,12 +260,13 @@ export default function VideoProjectDetailPage() {
         body: JSON.stringify({ sceneId, imagePrompt }),
       })
 
+      const data = await res.json().catch(() => null)
+
       if (res.ok) {
         await fetchData()
         toast({ title: 'Imagem gerada!' })
       } else {
-        const err = await res.json().catch(() => null)
-        toast({ title: err?.error || 'Erro ao gerar imagem', variant: 'destructive' })
+        toast({ title: data?.error || 'Erro ao gerar imagem', variant: 'destructive' })
       }
     } catch {
       toast({ title: 'Erro ao gerar imagem', variant: 'destructive' })
@@ -253,23 +275,24 @@ export default function VideoProjectDetailPage() {
     }
   }
 
-  async function generateSceneVideo(sceneId: string, videoPrompt: string, referenceImageUrl?: string) {
+  async function generateSceneVideo(sceneId: string, videoPrompt: string) {
     setGeneratingSceneVideo(sceneId)
-    toast({ title: 'Gerando video...', description: 'Pode levar 2-5 minutos.' })
+    toast({ title: 'Gerando video...', description: 'Pode levar 2-5 minutos. Requer billing Google Cloud.' })
 
     try {
       const res = await fetch('/api/videos/generate-video', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sceneId, videoPrompt, referenceImageUrl }),
+        body: JSON.stringify({ sceneId, videoPrompt }),
       })
+
+      const data = await res.json().catch(() => null)
 
       if (res.ok) {
         await fetchData()
         toast({ title: 'Video gerado!' })
       } else {
-        const err = await res.json().catch(() => null)
-        toast({ title: err?.error || 'Erro ao gerar video', variant: 'destructive' })
+        toast({ title: data?.error || 'Erro ao gerar video', variant: 'destructive' })
       }
     } catch {
       toast({ title: 'Erro ao gerar video', variant: 'destructive' })
@@ -279,8 +302,12 @@ export default function VideoProjectDetailPage() {
   }
 
   function copyToClipboard(text: string, label: string) {
-    navigator.clipboard.writeText(text)
-    toast({ title: `${label} copiado!` })
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text)
+      toast({ title: `${label} copiado!` })
+    } else {
+      toast({ title: 'Clipboard nao disponivel', variant: 'destructive' })
+    }
   }
 
   if (loading) {
@@ -297,8 +324,8 @@ export default function VideoProjectDetailPage() {
 
   const approvedCount = scenes.filter((s) => s.status === 'approved').length
   const totalDuration = scenes.reduce((acc, s) => acc + s.duration_seconds, 0)
-  const totalImages = scenes.reduce((acc, s) => acc + (s.image_urls?.length || 0), 0)
-  const totalVideos = scenes.reduce((acc, s) => acc + (s.video_urls?.length || 0), 0)
+  const totalImages = scenes.reduce((acc, s) => acc + (Array.isArray(s.image_urls) ? s.image_urls.length : 0), 0)
+  const totalVideos = scenes.reduce((acc, s) => acc + (Array.isArray(s.video_urls) ? s.video_urls.length : 0), 0)
 
   return (
     <div className="space-y-6">
@@ -332,10 +359,19 @@ export default function VideoProjectDetailPage() {
             ) : (
               <Wand2 className="mr-2 h-4 w-4" />
             )}
-            {generatingAssets ? 'Gerando...' : 'Gerar Imagens + Videos'}
+            {generatingAssets ? 'Gerando...' : 'Gerar Imagens'}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => regenerateScene('')}>
-            <RefreshCw className="mr-2 h-4 w-4" />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={regenerateAllScenes}
+            disabled={regeneratingId === 'all'}
+          >
+            {regeneratingId === 'all' ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="mr-2 h-4 w-4" />
+            )}
             Regenerar Cenas
           </Button>
           <Button size="sm" variant="outline" onClick={approveAll} disabled={approvedCount === scenes.length}>
@@ -371,8 +407,8 @@ export default function VideoProjectDetailPage() {
       <div className="space-y-3">
         {scenes.map((scene) => {
           const isExpanded = expandedScene === scene.id
-          const imageUrls = scene.image_urls || []
-          const videoUrls = scene.video_urls || []
+          const imageUrls = Array.isArray(scene.image_urls) ? scene.image_urls : []
+          const videoUrls = Array.isArray(scene.video_urls) ? scene.video_urls : []
           const hasAssets = imageUrls.length > 0 || videoUrls.length > 0
 
           return (
@@ -387,8 +423,9 @@ export default function VideoProjectDetailPage() {
               }`}
             >
               {/* Scene Header */}
-              <div
-                className="flex items-center gap-3 p-4 cursor-pointer"
+              <button
+                type="button"
+                className="flex items-center gap-3 p-4 cursor-pointer w-full text-left"
                 onClick={() => setExpandedScene(isExpanded ? null : scene.id)}
               >
                 <div className="flex-shrink-0">
@@ -431,7 +468,7 @@ export default function VideoProjectDetailPage() {
                 ) : (
                   <ChevronDown className="h-4 w-4 text-muted-foreground" />
                 )}
-              </div>
+              </button>
 
               {/* Expanded Content */}
               {isExpanded && (
@@ -567,13 +604,7 @@ export default function VideoProjectDetailPage() {
                               size="sm"
                               className="h-6 text-xs"
                               disabled={generatingSceneVideo === scene.id}
-                              onClick={() =>
-                                generateSceneVideo(
-                                  scene.id,
-                                  scene.video_prompt!,
-                                  imageUrls[0]
-                                )
-                              }
+                              onClick={() => generateSceneVideo(scene.id, scene.video_prompt!)}
                             >
                               {generatingSceneVideo === scene.id ? (
                                 <Loader2 className="mr-1 h-3 w-3 animate-spin" />
@@ -620,19 +651,6 @@ export default function VideoProjectDetailPage() {
                       >
                         <X className="mr-1 h-3.5 w-3.5" />
                         Reprovar
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={regeneratingId === scene.id}
-                        onClick={() => regenerateScene(scene.id)}
-                      >
-                        {regeneratingId === scene.id ? (
-                          <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Sparkles className="mr-1 h-3.5 w-3.5" />
-                        )}
-                        Regenerar
                       </Button>
                     </div>
                   </div>

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
-// Orchestrates: for each scene, generate image then video
+// Orchestrates: for each scene, generate image via OpenRouter
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
@@ -16,6 +16,17 @@ export async function POST(request: Request) {
 
     if (!projectId) {
       return NextResponse.json({ error: 'projectId obrigatorio' }, { status: 400 })
+    }
+
+    // Verify project belongs to user's org (via RLS)
+    const { data: project, error: projErr } = await supabase
+      .from('video_projects')
+      .select('id')
+      .eq('id', projectId)
+      .single()
+
+    if (projErr || !project) {
+      return NextResponse.json({ error: 'Projeto nao encontrado' }, { status: 404 })
     }
 
     // Get scenes to process
@@ -41,76 +52,103 @@ export async function POST(request: Request) {
       .update({ status: 'generating' })
       .eq('id', projectId)
 
-    const baseUrl = request.url.replace('/api/videos/generate-assets', '')
-    const cookies = request.headers.get('cookie') || ''
+    const apiKey = process.env.OPENROUTER_API_KEY
+    if (!apiKey) {
+      return NextResponse.json({ error: 'OPENROUTER_API_KEY nao configurada' }, { status: 500 })
+    }
 
-    const results: { sceneId: string; images: number; videos: number; error?: string }[] = []
+    const results: { sceneId: string; images: number; error?: string }[] = []
 
     // Process scenes sequentially to avoid rate limits
     for (const scene of scenes) {
-      const sceneResult: { sceneId: string; images: number; videos: number; error?: string } = {
+      const sceneResult: { sceneId: string; images: number; error?: string } = {
         sceneId: scene.id,
         images: 0,
-        videos: 0,
       }
 
       try {
-        // Step 1: Generate image
         if (scene.image_prompt) {
-          const imgRes = await fetch(`${baseUrl}/api/videos/generate-image`, {
+          // Update scene status
+          await supabase
+            .from('video_scenes')
+            .update({ status: 'generating_image' })
+            .eq('id', scene.id)
+
+          // Generate image via OpenRouter directly (same logic as generate-image route)
+          const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Cookie': cookies,
+              'Authorization': `Bearer ${apiKey}`,
+              'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'https://plataforma-email.vercel.app',
             },
             body: JSON.stringify({
-              sceneId: scene.id,
-              imagePrompt: scene.image_prompt,
+              model: 'google/gemini-2.5-flash-image',
+              messages: [{ role: 'user', content: scene.image_prompt }],
+              modalities: ['image', 'text'],
+              image_config: { aspect_ratio: '9:16', image_size: '1K' },
             }),
           })
 
-          if (imgRes.ok) {
-            const imgData = await imgRes.json()
-            sceneResult.images = imgData.totalImages || 0
-
-            // Step 2: Generate video using the generated image as reference
-            if (scene.video_prompt && imgData.imageUrls?.[0]) {
-              const vidRes = await fetch(`${baseUrl}/api/videos/generate-video`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Cookie': cookies,
-                },
-                body: JSON.stringify({
-                  sceneId: scene.id,
-                  videoPrompt: scene.video_prompt,
-                  referenceImageUrl: imgData.imageUrls[0],
-                }),
-              })
-
-              if (vidRes.ok) {
-                const vidData = await vidRes.json()
-                sceneResult.videos = vidData.totalVideos || 0
-              } else {
-                sceneResult.error = 'Erro ao gerar video'
-              }
-            }
-          } else {
-            sceneResult.error = 'Erro ao gerar imagem'
+          if (!response.ok) {
+            sceneResult.error = 'Erro na API de imagem'
+            await supabase.from('video_scenes').update({ status: 'pending' }).eq('id', scene.id)
+            results.push(sceneResult)
+            continue
           }
+
+          const data = await response.json()
+          const images = data.choices?.[0]?.message?.images || []
+          const imageUrls: string[] = []
+
+          for (let i = 0; i < images.length; i++) {
+            const img = images[i]
+            const dataUrl = img?.image_url?.url || img?.url
+            if (!dataUrl || !dataUrl.startsWith('data:')) continue
+
+            const matches = dataUrl.match(/^data:(image\/\w+);base64,(.+)$/)
+            if (!matches) continue
+
+            const mimeType = matches[1]
+            const base64Data = matches[2]
+            const buffer = Buffer.from(base64Data, 'base64')
+            const ext = mimeType.includes('png') ? 'png' : 'jpg'
+            const fileName = `videos/${scene.id}/image_${Date.now()}_${i}.${ext}`
+
+            const { error: uploadError } = await supabase.storage
+              .from('video-assets')
+              .upload(fileName, buffer, { contentType: mimeType, upsert: true })
+
+            if (!uploadError) {
+              const { data: urlData } = supabase.storage
+                .from('video-assets')
+                .getPublicUrl(fileName)
+              imageUrls.push(urlData.publicUrl)
+            }
+          }
+
+          const existingUrls = (scene.image_urls as string[]) || []
+          const allUrls = [...existingUrls, ...imageUrls]
+
+          await supabase
+            .from('video_scenes')
+            .update({ image_urls: allUrls, status: 'pending' })
+            .eq('id', scene.id)
+
+          sceneResult.images = imageUrls.length
         }
       } catch (err) {
         sceneResult.error = err instanceof Error ? err.message : 'Erro desconhecido'
+        await supabase.from('video_scenes').update({ status: 'pending' }).eq('id', scene.id)
       }
 
       results.push(sceneResult)
     }
 
-    // Update project status
-    const hasErrors = results.some(r => r.error)
+    // Update project status back to ready
     await supabase
       .from('video_projects')
-      .update({ status: hasErrors ? 'ready' : 'ready' })
+      .update({ status: 'ready' })
       .eq('id', projectId)
 
     return NextResponse.json({

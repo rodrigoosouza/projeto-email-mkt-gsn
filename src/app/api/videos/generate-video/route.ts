@@ -145,6 +145,15 @@ export async function POST(request: Request) {
     })
   } catch (err) {
     console.error('Generate video error:', err)
+    const message = err instanceof Error ? err.message : ''
+    if (message.includes('billing') || message.includes('FAILED_PRECONDITION')) {
+      return NextResponse.json({
+        error: 'Veo 3 requer Google Cloud Billing ativado. Acesse console.cloud.google.com/billing para ativar ($300 credito gratis).'
+      }, { status: 402 })
+    }
+    if (message.includes('quota') || message.includes('rate')) {
+      return NextResponse.json({ error: 'Limite de quota da API atingido. Aguarde alguns minutos.' }, { status: 429 })
+    }
     return NextResponse.json({ error: 'Erro ao gerar video' }, { status: 500 })
   }
 }
