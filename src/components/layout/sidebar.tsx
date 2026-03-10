@@ -30,6 +30,7 @@ import {
   ClipboardList,
   Video,
   Workflow,
+  CalendarDays,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -60,6 +61,7 @@ import { createOrganization } from '@/lib/supabase/organizations'
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Marketing', href: '/marketing', icon: ClipboardList },
+  { name: 'Calendario', href: '/content-calendar', icon: CalendarDays },
   { name: 'Leads', href: '/leads', icon: Users },
   { name: 'Segmentos', href: '/segments', icon: Filter },
   { name: 'Templates', href: '/templates', icon: FileText },
