@@ -384,6 +384,7 @@ function NewLandingPagePage() {
           brand: state.brand,
           messages: apiMessages,
           session_id: state.sessionId,
+          org_id: currentOrg?.id,
         }),
       })
 

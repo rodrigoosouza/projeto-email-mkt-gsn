@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Loader2, Building2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,6 +20,7 @@ interface OnboardingScreenProps {
 }
 
 export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
+  const router = useRouter()
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -48,6 +50,7 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
       if (rpcError) throw rpcError
 
       await onComplete()
+      router.push('/marketing')
     } catch (err) {
       console.error('Erro ao criar organizacao:', err)
       setError('Erro ao criar organizacao. Tente novamente.')

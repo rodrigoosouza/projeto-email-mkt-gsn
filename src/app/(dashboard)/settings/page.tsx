@@ -10,8 +10,6 @@ import { DomainVerification } from '@/components/settings/domain-verification'
 import { CustomFieldsManager } from '@/components/settings/custom-fields-manager'
 import { ScoringRulesManager } from '@/components/settings/scoring-rules-manager'
 import { IntegrationsManager } from '@/components/settings/integrations-manager'
-import { LanguageSelector } from '@/components/settings/language-selector'
-import { WhiteLabelManager } from '@/components/settings/white-label-manager'
 import { AppearanceSettings } from '@/components/settings/appearance-settings'
 
 export default function SettingsPage() {
@@ -34,8 +32,6 @@ export default function SettingsPage() {
           <TabsTrigger value="lead-scoring">Lead Scoring</TabsTrigger>
           <TabsTrigger value="integrations">Integracoes</TabsTrigger>
           <TabsTrigger value="appearance">Aparencia</TabsTrigger>
-          <TabsTrigger value="white-label">White Label</TabsTrigger>
-          <TabsTrigger value="language">Idioma</TabsTrigger>
         </TabsList>
 
         <TabsContent value="organization">
@@ -79,14 +75,6 @@ export default function SettingsPage() {
 
         <TabsContent value="appearance">
           <AppearanceSettings />
-        </TabsContent>
-
-        <TabsContent value="white-label">
-          <WhiteLabelManager />
-        </TabsContent>
-
-        <TabsContent value="language">
-          <LanguageSelector />
         </TabsContent>
       </Tabs>
     </div>

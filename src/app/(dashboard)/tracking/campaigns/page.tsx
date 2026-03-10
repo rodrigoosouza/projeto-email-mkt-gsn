@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Loader2, Search } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -31,8 +31,17 @@ import {
   formatPercent,
 } from '@/lib/tracking/utils'
 import { CHART_COLORS, CHANNEL_COLORS } from '@/lib/tracking/constants'
+import { useOrganizationContext } from '@/contexts/organization-context'
 
 type DateRangeOption = '7d' | '30d' | '90d'
+
+function orgNameToTrackingId(name: string): string {
+  const lower = name.toLowerCase()
+  if (lower.includes('templum')) return 'templum'
+  if (lower.includes('orbit')) return 'orbit'
+  if (lower.includes('evolutto')) return 'evolutto'
+  return 'all'
+}
 
 const DATE_RANGE_OPTIONS: { label: string; value: DateRangeOption }[] = [
   { label: '7 dias', value: '7d' },
@@ -41,8 +50,13 @@ const DATE_RANGE_OPTIONS: { label: string; value: DateRangeOption }[] = [
 ]
 
 export default function TrackingCampaignsPage() {
+  const { currentOrg } = useOrganizationContext()
   const [dateRange, setDateRange] = useState<DateRangeOption>('30d')
   const [selectedOrg, setSelectedOrg] = useState('all')
+
+  useEffect(() => {
+    if (currentOrg) setSelectedOrg(orgNameToTrackingId(currentOrg.name))
+  }, [currentOrg?.id])
   const [search, setSearch] = useState('')
 
   const { startDate, endDate } = useMemo(() => getDateRange(dateRange), [dateRange])

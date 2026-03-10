@@ -4,7 +4,6 @@ import './globals.css'
 import { Toaster } from '@/components/ui/toaster'
 import { PwaRegister } from '@/components/shared/pwa-register'
 import { PwaInstallPrompt } from '@/components/shared/pwa-install-prompt'
-import { LocaleProvider } from '@/contexts/locale-context'
 import { ThemeProvider } from '@/components/shared/theme-provider'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -36,12 +35,10 @@ export default function RootLayout({
     <html lang="pt-BR" suppressHydrationWarning>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          <LocaleProvider>
             {children}
             <Toaster />
             <PwaRegister />
             <PwaInstallPrompt />
-          </LocaleProvider>
         </ThemeProvider>
       </body>
     </html>

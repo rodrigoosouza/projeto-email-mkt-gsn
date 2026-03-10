@@ -9,6 +9,12 @@ export interface DashboardData {
   totalDelivered: number
   openRate: number
   clickRate: number
+  totalLandingPages: number
+  totalForms: number
+  totalFormSubmissions: number
+  totalTemplates: number
+  totalSegments: number
+  activeCampaigns: number
   recentCampaigns: {
     id: string
     name: string
@@ -31,8 +37,10 @@ export interface DashboardData {
 export async function getDashboardData(orgId: string): Promise<DashboardData> {
   const supabase = createClient()
 
-  const [leadsResult, campaignsResult, statsResult, recentLeadsResult, recentCampaignsResult] =
-    await Promise.all([
+  const [
+    leadsResult, campaignsResult, statsResult, recentLeadsResult, recentCampaignsResult,
+    landingPagesResult, formsResult, formSubmissionsResult, templatesResult, segmentsResult, activeCampaignsResult,
+  ] = await Promise.all([
       // Total leads count
       supabase
         .from('leads')
@@ -64,6 +72,37 @@ export async function getDashboardData(orgId: string): Promise<DashboardData> {
         .eq('org_id', orgId)
         .order('created_at', { ascending: false })
         .limit(5),
+      // Landing pages count
+      supabase
+        .from('landing_pages')
+        .select('*', { count: 'exact', head: true })
+        .eq('org_id', orgId),
+      // Forms count
+      supabase
+        .from('forms')
+        .select('*', { count: 'exact', head: true })
+        .eq('org_id', orgId),
+      // Form submissions count
+      supabase
+        .from('form_submissions')
+        .select('*', { count: 'exact', head: true })
+        .eq('org_id', orgId),
+      // Templates count
+      supabase
+        .from('email_templates')
+        .select('*', { count: 'exact', head: true })
+        .eq('org_id', orgId),
+      // Segments count
+      supabase
+        .from('segments')
+        .select('*', { count: 'exact', head: true })
+        .eq('org_id', orgId),
+      // Active campaigns count
+      supabase
+        .from('campaigns')
+        .select('*', { count: 'exact', head: true })
+        .eq('org_id', orgId)
+        .in('status', ['sending', 'scheduled']),
     ])
 
   const totalLeads = leadsResult.count || 0
@@ -131,6 +170,12 @@ export async function getDashboardData(orgId: string): Promise<DashboardData> {
     totalDelivered,
     openRate,
     clickRate,
+    totalLandingPages: landingPagesResult.count || 0,
+    totalForms: formsResult.count || 0,
+    totalFormSubmissions: formSubmissionsResult.count || 0,
+    totalTemplates: templatesResult.count || 0,
+    totalSegments: segmentsResult.count || 0,
+    activeCampaigns: activeCampaignsResult.count || 0,
     recentCampaigns,
     recentLeads,
   }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { generateAIResponse } from '@/lib/chatbot/ai-client'
+import { getOrgContext } from '@/lib/supabase/org-context'
 import type { ChatbotConfig, ChatbotMessage } from '@/lib/types'
 
 const CORS_HEADERS = {
@@ -126,8 +127,15 @@ export async function POST(
           .filter((m: any) => m.content !== message || m.role !== 'visitor')
           .map((m: any) => ({ role: m.role, content: m.content }))
 
+        // Enrich system prompt with org context (briefing, ICP, persona)
+        let systemPrompt = chatbot.ai_system_prompt || ''
+        const orgContext = await getOrgContext(chatbot.org_id)
+        if (orgContext?.summary) {
+          systemPrompt = `CONTEXTO DA EMPRESA:\n${orgContext.summary}\n\n${systemPrompt}`
+        }
+
         responseText = await generateAIResponse(
-          chatbot.ai_system_prompt || '',
+          systemPrompt,
           conversationHistory,
           message,
           chatbot.ai_model || 'anthropic/claude-haiku-4-5-20251001'

@@ -1,6 +1,17 @@
 'use client'
 
-import { Users, Mail, Eye, MousePointerClick } from 'lucide-react'
+import {
+  Users,
+  Mail,
+  Eye,
+  MousePointerClick,
+  Globe,
+  FileText,
+  Send,
+  Filter,
+  FormInput,
+  BarChart3,
+} from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -10,6 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { KpiCard } from '@/components/shared/kpi-card'
 import { EmptyState } from '@/components/shared/empty-state'
 import { useDashboard } from '@/hooks/use-dashboard'
+import { SetupChecklist } from '@/components/shared/setup-checklist'
 import {
   CAMPAIGN_STATUS_LABELS,
   CAMPAIGN_STATUS_COLORS,
@@ -75,7 +87,10 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* KPI Cards */}
+      {/* Setup Checklist */}
+      <SetupChecklist />
+
+      {/* KPI Cards - Row 1: Core */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           icon={Users}
@@ -96,6 +111,40 @@ export default function DashboardPage() {
           icon={MousePointerClick}
           label="Taxa de Clique"
           value={`${data?.clickRate ?? 0}%`}
+        />
+      </div>
+
+      {/* KPI Cards - Row 2: Modules */}
+      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
+        <KpiCard
+          icon={Send}
+          label="Campanhas Ativas"
+          value={data?.activeCampaigns ?? 0}
+        />
+        <KpiCard
+          icon={Globe}
+          label="Landing Pages"
+          value={data?.totalLandingPages ?? 0}
+        />
+        <KpiCard
+          icon={FormInput}
+          label="Formularios"
+          value={data?.totalForms ?? 0}
+        />
+        <KpiCard
+          icon={BarChart3}
+          label="Submissions"
+          value={data?.totalFormSubmissions ?? 0}
+        />
+        <KpiCard
+          icon={FileText}
+          label="Templates"
+          value={data?.totalTemplates ?? 0}
+        />
+        <KpiCard
+          icon={Filter}
+          label="Segmentos"
+          value={data?.totalSegments ?? 0}
         />
       </div>
 

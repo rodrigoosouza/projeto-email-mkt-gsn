@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard,
   Users,
@@ -86,6 +86,7 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname()
+  const router = useRouter()
   const { user, signOut } = useAuth()
   const { organizations, currentOrg, switchOrganization, refetch } = useOrganizationContext()
   const { toast } = useToast()
@@ -106,7 +107,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       await refetch()
       setShowCreateDialog(false)
       setNewOrgName('')
-      toast({ title: 'Organizacao criada', description: `"${org.name}" foi criada com sucesso.` })
+      toast({ title: 'Organizacao criada', description: `"${org.name}" foi criada. Preencha o briefing para comecar.` })
+      router.push('/marketing')
     } catch (error) {
       console.error('Erro ao criar organizacao:', error)
       toast({

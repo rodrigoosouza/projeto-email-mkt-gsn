@@ -3,6 +3,7 @@ import { buildSystemPrompt, sendMessage, extractHtmlFromResponse, extractMessage
 import { loadBrandLogoBase64 } from '@/lib/lp-builder/brands';
 import { Brand, UploadedImage, ApiMessage, ContentBlock } from '@/lib/lp-builder/types';
 import { createClient } from '@/lib/supabase/server';
+import { getOrgContext } from '@/lib/supabase/org-context';
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,11 +17,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { brand, messages, session_id, images } = await req.json() as {
+    const { brand, messages, session_id, images, org_id } = await req.json() as {
       brand: Brand;
       messages: Array<{ role: 'user' | 'assistant'; content: string; images?: UploadedImage[] }>;
       session_id: string;
       images?: UploadedImage[];
+      org_id?: string;
     };
 
     if (!brand || !messages || !session_id) {
@@ -48,8 +50,17 @@ export async function POST(req: NextRequest) {
     const allImages = images || [];
     const imageCount = allImages.length;
 
-    const systemPrompt = await buildSystemPrompt(brand, imageCount);
-    console.log(`[Chat API] Brand: ${brand}, Messages: ${messages.length}, Images: ${imageCount}, System prompt length: ${systemPrompt.length}`);
+    let systemPrompt = await buildSystemPrompt(brand, imageCount);
+
+    // Enrich with org context (briefing, ICP, persona) if org_id provided
+    if (org_id) {
+      const orgContext = await getOrgContext(org_id)
+      if (orgContext?.summary) {
+        systemPrompt += `\n\n═══════════════════════════════════════════\nCONTEXTO DA ORGANIZACAO (usar para personalizar a LP)\n═══════════════════════════════════════════\n\n${orgContext.summary}`
+      }
+    }
+
+    console.log(`[Chat API] Brand: ${brand}, Messages: ${messages.length}, Images: ${imageCount}, OrgContext: ${!!org_id}, System prompt length: ${systemPrompt.length}`);
 
     // Build API messages with multimodal support
     const apiMessages: ApiMessage[] = messages.map((m, idx) => {

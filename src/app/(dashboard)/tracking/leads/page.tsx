@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Download, Search, Loader2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -43,8 +43,17 @@ import {
   TEMPERATURE_LABELS,
   CHANNEL_COLORS,
 } from '@/lib/tracking/constants'
+import { useOrganizationContext } from '@/contexts/organization-context'
 
 type DateRangeOption = '7d' | '30d' | '90d'
+
+function orgNameToTrackingId(name: string): string {
+  const lower = name.toLowerCase()
+  if (lower.includes('templum')) return 'templum'
+  if (lower.includes('orbit')) return 'orbit'
+  if (lower.includes('evolutto')) return 'evolutto'
+  return 'all'
+}
 
 const DATE_RANGE_OPTIONS: { label: string; value: DateRangeOption }[] = [
   { label: '7 dias', value: '7d' },
@@ -69,8 +78,13 @@ const TEMP_OPTIONS = [
 
 export default function TrackingLeadsPage() {
   const router = useRouter()
+  const { currentOrg } = useOrganizationContext()
   const [dateRange, setDateRange] = useState<DateRangeOption>('30d')
   const [selectedOrg, setSelectedOrg] = useState('all')
+
+  useEffect(() => {
+    if (currentOrg) setSelectedOrg(orgNameToTrackingId(currentOrg.name))
+  }, [currentOrg?.id])
   const [search, setSearch] = useState('')
   const [temperature, setTemperature] = useState('')
   const [status, setStatus] = useState('')
