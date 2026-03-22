@@ -79,6 +79,7 @@ export default function ContentCalendarPage() {
   const [editingPost, setEditingPost] = useState<ContentPost | null>(null)
   const [generatingImage, setGeneratingImage] = useState<string | null>(null)
   const [imageFormatChoice, setImageFormatChoice] = useState<'1:1' | '9:16' | '16:9'>('1:1')
+  const [carouselCardCount, setCarouselCardCount] = useState(5)
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
 
@@ -397,31 +398,67 @@ export default function ContentCalendarPage() {
                 )}
 
                 {/* Image prompt + format selector + generate button */}
-                {editingPost.image_prompt && (
+                {editingPost.image_prompt && (() => {
+                  const fmt = editingPost.format as string
+                  const isCarousel = fmt === 'carrossel' || fmt === 'carousel'
+                  const isReels = fmt === 'reels' || fmt === 'video-curto'
+                  const formatToSend = isCarousel ? 'carrossel' : isReels ? 'reels' : (imageFormatChoice === '9:16' ? 'reels' : imageFormatChoice === '16:9' ? 'video-longo' : 'post-estatico')
+
+                  return (
                   <div className="space-y-3 p-3 border rounded-lg bg-muted/30">
-                    <Label className="text-xs text-muted-foreground">Prompt de Imagem</Label>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs text-muted-foreground">Prompt de Imagem</Label>
+                      {isCarousel && <Badge variant="outline" className="text-xs">Carrossel — {carouselCardCount} cards</Badge>}
+                      {isReels && <Badge variant="outline" className="text-xs">Foto base para Reels</Badge>}
+                    </div>
                     <p className="text-sm text-muted-foreground italic">{editingPost.image_prompt}</p>
 
-                    <div className="flex items-center gap-2">
-                      <Label className="text-xs whitespace-nowrap">Tamanho:</Label>
-                      <div className="flex gap-1">
-                        {([
-                          { value: '1:1', label: 'Feed (1:1)', icon: '⬜' },
-                          { value: '9:16', label: 'Story (9:16)', icon: '📱' },
-                          { value: '16:9', label: 'Wide (16:9)', icon: '🖥️' },
-                        ] as const).map(opt => (
-                          <Button
-                            key={opt.value}
-                            type="button"
-                            size="sm"
-                            variant={imageFormatChoice === opt.value ? 'default' : 'outline'}
-                            onClick={() => setImageFormatChoice(opt.value)}
-                            className="h-7 text-xs"
-                          >
-                            {opt.icon} {opt.label}
-                          </Button>
-                        ))}
-                      </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {/* Tamanho (auto-detect or manual) */}
+                      {!isCarousel && !isReels && (
+                        <>
+                          <Label className="text-xs whitespace-nowrap">Tamanho:</Label>
+                          <div className="flex gap-1">
+                            {([
+                              { value: '1:1', label: 'Feed', icon: '⬜' },
+                              { value: '9:16', label: 'Story', icon: '📱' },
+                              { value: '16:9', label: 'Wide', icon: '🖥️' },
+                            ] as const).map(opt => (
+                              <Button
+                                key={opt.value}
+                                type="button"
+                                size="sm"
+                                variant={imageFormatChoice === opt.value ? 'default' : 'outline'}
+                                onClick={() => setImageFormatChoice(opt.value)}
+                                className="h-7 text-xs"
+                              >
+                                {opt.icon} {opt.label}
+                              </Button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+
+                      {/* Carousel card count */}
+                      {isCarousel && (
+                        <>
+                          <Label className="text-xs whitespace-nowrap">Cards:</Label>
+                          <div className="flex gap-1">
+                            {[3, 4, 5, 6, 7, 8, 10].map(n => (
+                              <Button
+                                key={n}
+                                type="button"
+                                size="sm"
+                                variant={carouselCardCount === n ? 'default' : 'outline'}
+                                onClick={() => setCarouselCardCount(n)}
+                                className="h-7 w-8 text-xs p-0"
+                              >
+                                {n}
+                              </Button>
+                            ))}
+                          </div>
+                        </>
+                      )}
                     </div>
 
                     <Button
@@ -436,12 +473,16 @@ export default function ContentCalendarPage() {
                             body: JSON.stringify({
                               postId: editingPost.id,
                               imagePrompt: editingPost.image_prompt,
-                              format: imageFormatChoice === '9:16' ? 'reels' : imageFormatChoice === '16:9' ? 'video-longo' : 'post-estatico',
+                              format: formatToSend,
+                              cardCount: isCarousel ? carouselCardCount : undefined,
                             }),
                           })
                           const data = await res.json()
                           if (!res.ok) throw new Error(data.error)
-                          toast({ title: 'Imagem gerada!' })
+                          const msg = isCarousel
+                            ? `${data.cardsGenerated} cards do carrossel gerados!`
+                            : isReels ? 'Foto base para Reels gerada!' : 'Imagem gerada!'
+                          toast({ title: msg })
                           setEditingPost({
                             ...editingPost,
                             image_urls: [...(editingPost.image_urls || []), ...data.imageUrls],
@@ -456,15 +497,22 @@ export default function ContentCalendarPage() {
                       className="w-full"
                     >
                       {generatingImage === editingPost.id ? (
-                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Gerando imagem...</>
+                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          {isCarousel ? `Gerando ${carouselCardCount} cards...` : isReels ? 'Gerando foto base...' : 'Gerando imagem...'}
+                        </>
                       ) : editingPost.image_urls?.length > 0 ? (
-                        <><RefreshCw className="mr-2 h-4 w-4" /> Gerar nova variacao</>
+                        <><RefreshCw className="mr-2 h-4 w-4" />
+                          {isCarousel ? `Regerar carrossel (${carouselCardCount} cards)` : 'Gerar nova variacao'}
+                        </>
                       ) : (
-                        <><ImageIcon className="mr-2 h-4 w-4" /> Gerar Imagem com IA</>
+                        <><ImageIcon className="mr-2 h-4 w-4" />
+                          {isCarousel ? `Gerar ${carouselCardCount} cards do carrossel` : isReels ? 'Gerar foto base para Reels' : 'Gerar Imagem com IA'}
+                        </>
                       )}
                     </Button>
                   </div>
-                )}
+                  )
+                })()}
               </div>
             </>
           )}
