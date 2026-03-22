@@ -1,4 +1,4 @@
-export const GROWTH_SYSTEM_PROMPT = `Você é o Copiloto de Growth do Orbit — o analista de marketing e vendas mais completo que existe. Você tem acesso a TODOS os dados reais de performance: Meta Ads (criativos, públicos, campanhas), CRM Pipedrive (deals, funil, atividades, notas), Tracking GTM (sessões, páginas, fontes, geografia) e o cruzamento entre eles.
+export const GROWTH_SYSTEM_PROMPT = `Você é o Copiloto de Growth do Orbit — o analista de marketing e vendas mais completo que existe. Você tem acesso a TODOS os dados reais de performance: Meta Ads (criativos, públicos, campanhas), CRM Pipedrive (deals, funil, atividades, notas), Tracking GTM (sessões, páginas, fontes, geografia), Google Analytics 4 (sessões, bounce rate, conversões, dispositivos, eventos) e o cruzamento entre eles.
 
 ## Sobre o Orbit
 
@@ -162,6 +162,50 @@ export function buildDataContext(snapshot: any): string {
     s.tracking.topStates.forEach((st: any) => {
       lines.push('- ' + st.state + ': ' + st.sessions + ' sessões, ' + st.leads + ' leads, Conv ' + st.convRate.toFixed(1) + '%')
     })
+  }
+
+  // GA4
+  if (s.ga4) {
+    lines.push('\n### GOOGLE ANALYTICS 4')
+    if (s.ga4.overview) {
+      const o = s.ga4.overview
+      lines.push('Sessões: ' + o.sessions + ' | Usuários: ' + o.totalUsers + ' | Novos: ' + o.newUsers + ' | Page Views: ' + o.pageViews + ' | Bounce Rate: ' + o.bounceRate.toFixed(1) + '% | Duração Média: ' + Math.round(o.avgSessionDuration) + 's | Conversões: ' + o.conversions + ' | Sessões Engajadas: ' + o.engagedSessions)
+    }
+
+    if (s.ga4.sources?.length > 0) {
+      lines.push('\nFontes de tráfego (GA4):')
+      s.ga4.sources.slice(0, 10).forEach((src: any) => {
+        lines.push('- ' + src.source + '/' + src.medium + ': ' + src.sessions + ' sessões, ' + src.users + ' usuários, ' + src.conversions + ' conversões, Bounce ' + (src.bounceRate || 0).toFixed(1) + '%')
+      })
+    }
+
+    if (s.ga4.topPages?.length > 0) {
+      lines.push('\nTop páginas (GA4):')
+      s.ga4.topPages.slice(0, 10).forEach((p: any) => {
+        lines.push('- ' + p.pagePath + ': ' + p.pageViews + ' views, ' + p.users + ' usuários, Bounce ' + (p.bounceRate || 0).toFixed(1) + '%, Conv ' + (p.conversions || 0))
+      })
+    }
+
+    if (s.ga4.geography?.length > 0) {
+      lines.push('\nGeografia (GA4):')
+      s.ga4.geography.slice(0, 10).forEach((g: any) => {
+        lines.push('- ' + g.region + ': ' + g.sessions + ' sessões, ' + g.users + ' usuários, ' + g.conversions + ' conversões')
+      })
+    }
+
+    if (s.ga4.devices?.length > 0) {
+      lines.push('\nDispositivos (GA4):')
+      s.ga4.devices.forEach((d: any) => {
+        lines.push('- ' + d.device + ': ' + d.sessions + ' sessões, ' + d.users + ' usuários')
+      })
+    }
+
+    if (s.ga4.topEvents?.length > 0) {
+      lines.push('\nTop eventos (GA4):')
+      s.ga4.topEvents.slice(0, 10).forEach((e: any) => {
+        lines.push('- ' + e.eventName + ': ' + e.count + 'x, ' + e.users + ' usuários')
+      })
+    }
   }
 
   return lines.join('\n')

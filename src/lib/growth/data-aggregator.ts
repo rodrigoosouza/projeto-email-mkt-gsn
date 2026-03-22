@@ -34,6 +34,14 @@ export interface GrowthDataSnapshot {
     topPages: { path: string; views: number; sessions: number; leads: number; convRate: number }[]
     topStates: { state: string; sessions: number; leads: number; convRate: number }[]
   }
+  ga4: {
+    overview: { sessions: number; totalUsers: number; newUsers: number; pageViews: number; avgSessionDuration: number; bounceRate: number; conversions: number; engagedSessions: number } | null
+    sources: { source: string; medium: string; sessions: number; users: number; conversions: number; bounceRate: number }[]
+    topPages: { pagePath: string; pageViews: number; users: number; avgDuration: number; bounceRate: number; conversions: number }[]
+    geography: { region: string; sessions: number; users: number; conversions: number }[]
+    devices: { device: string; sessions: number; users: number; conversions: number }[]
+    topEvents: { eventName: string; count: number; users: number }[]
+  } | null
 }
 
 export async function aggregateGrowthData(orgId: string, fromDate: string, toDate: string): Promise<GrowthDataSnapshot> {
@@ -227,6 +235,26 @@ export async function aggregateGrowthData(orgId: string, fromDate: string, toDat
     crmAudienceMap.set(content, e)
   })
 
+  // === GOOGLE ANALYTICS 4 ===
+  let ga4Data: GrowthDataSnapshot['ga4'] = null
+  try {
+    const { getFullReport } = await import('@/lib/analytics/ga4-client')
+    const propertyId = process.env.GA4_PROPERTY_ID
+    if (propertyId) {
+      const report = await getFullReport(propertyId, fromDate, toDate)
+      ga4Data = {
+        overview: report.overview,
+        sources: report.sources as any,
+        topPages: report.pages as any,
+        geography: report.geography as any,
+        devices: report.devices as any,
+        topEvents: report.events as any,
+      }
+    }
+  } catch (e: any) {
+    console.error('[Growth Aggregator] GA4 error:', e.message)
+  }
+
   // === TRACKING GTM ===
   const trackingOrg = getTrackingOrgByOrgId(orgId)
   let trackingKpis = { sessions: 0, visitors: 0, pageViews: 0, leads: 0, convRate: 0 }
@@ -375,5 +403,6 @@ export async function aggregateGrowthData(orgId: string, fromDate: string, toDat
       recentNotes,
     },
     tracking: { kpis: trackingKpis, topSources, topPages, topStates },
+    ga4: ga4Data,
   }
 }
