@@ -10,6 +10,8 @@ import {
   Trash2,
   Pencil,
   Calendar,
+  ImageIcon,
+  RefreshCw,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -75,6 +77,7 @@ export default function ContentCalendarPage() {
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [editingPost, setEditingPost] = useState<ContentPost | null>(null)
+  const [generatingImage, setGeneratingImage] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
 
   const [year, month] = currentMonth.split('-').map(Number)
@@ -374,10 +377,63 @@ export default function ContentCalendarPage() {
                     <p className="text-sm mt-1">{editingPost.hashtags.map((h) => `#${h}`).join(' ')}</p>
                   </div>
                 )}
-                {editingPost.image_prompt && (
+                {/* Generated images */}
+                {editingPost.image_urls && editingPost.image_urls.length > 0 && (
                   <div>
+                    <Label className="text-xs text-muted-foreground">Imagens Geradas</Label>
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      {editingPost.image_urls.map((url: string, i: number) => (
+                        <img key={i} src={url} alt={`Imagem ${i + 1}`} className="w-full rounded-lg border" />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Image prompt + generate button */}
+                {editingPost.image_prompt && (
+                  <div className="space-y-2">
                     <Label className="text-xs text-muted-foreground">Prompt de Imagem</Label>
-                    <p className="text-sm mt-1 text-muted-foreground italic">{editingPost.image_prompt}</p>
+                    <p className="text-sm text-muted-foreground italic">{editingPost.image_prompt}</p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={generatingImage === editingPost.id}
+                      onClick={async () => {
+                        setGeneratingImage(editingPost.id)
+                        try {
+                          const res = await fetch('/api/content-calendar/generate-image', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              postId: editingPost.id,
+                              imagePrompt: editingPost.image_prompt,
+                              format: editingPost.format,
+                            }),
+                          })
+                          const data = await res.json()
+                          if (!res.ok) throw new Error(data.error)
+                          toast({ title: 'Imagem gerada!' })
+                          // Update local state with new images
+                          setEditingPost({
+                            ...editingPost,
+                            image_urls: [...(editingPost.image_urls || []), ...data.imageUrls],
+                          })
+                          fetchPosts()
+                        } catch (error: any) {
+                          toast({ title: 'Erro ao gerar imagem', description: error.message, variant: 'destructive' })
+                        } finally {
+                          setGeneratingImage(null)
+                        }
+                      }}
+                    >
+                      {generatingImage === editingPost.id ? (
+                        <><Loader2 className="mr-2 h-3 w-3 animate-spin" /> Gerando imagem...</>
+                      ) : editingPost.image_urls?.length > 0 ? (
+                        <><RefreshCw className="mr-2 h-3 w-3" /> Gerar nova imagem</>
+                      ) : (
+                        <><ImageIcon className="mr-2 h-3 w-3" /> Gerar Imagem com IA</>
+                      )}
+                    </Button>
                   </div>
                 )}
               </div>
