@@ -44,22 +44,24 @@ export async function GET(req: NextRequest) {
     const decodedEmail = email ? decodeURIComponent(email) : null
     const decodedPhone = phone ? decodeURIComponent(phone) : null
 
-    // Normalize phone variants for matching (e.g. "19996022561" → also try "+5519996022561")
+    // Normalize phone: strip all non-digit characters first
     const phoneVariants: string[] = []
     if (decodedPhone) {
       phoneVariants.push(decodedPhone)
-      // If no country code, add +55 variant
-      if (!decodedPhone.startsWith('+')) {
-        phoneVariants.push(`+55${decodedPhone}`)
+      // Strip formatting: (19) 99602-2561 → 19996022561
+      const digits = decodedPhone.replace(/\D/g, '')
+      if (digits && digits !== decodedPhone) {
+        phoneVariants.push(digits)
       }
-      // If starts with +55, add without country code
-      if (decodedPhone.startsWith('+55')) {
-        phoneVariants.push(decodedPhone.slice(3))
+      // Add +55 variant
+      if (digits && !digits.startsWith('55')) {
+        phoneVariants.push(`+55${digits}`)
+        phoneVariants.push(`55${digits}`)
       }
-      // If starts with 55 (no +), add with + and without
-      if (decodedPhone.startsWith('55') && !decodedPhone.startsWith('+') && decodedPhone.length > 11) {
-        phoneVariants.push(`+${decodedPhone}`)
-        phoneVariants.push(decodedPhone.slice(2))
+      // If starts with 55, add without country code
+      if (digits && digits.startsWith('55') && digits.length > 11) {
+        phoneVariants.push(`+${digits}`)
+        phoneVariants.push(digits.slice(2))
       }
     }
 
