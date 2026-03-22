@@ -22,7 +22,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
     }
 
-    const { campaignId, pageId, linkUrl, pixelId, placementPreset, conversionLocation, customAudiences } = await request.json()
+    const {
+      campaignId, pageId, linkUrl, pixelId, placementPreset, conversionLocation, customAudiences,
+      nameCampaign, nameAdSet, nameAd,
+    } = await request.json()
     if (!campaignId) {
       return NextResponse.json({ error: 'campaignId é obrigatório' }, { status: 400 })
     }
@@ -78,6 +81,20 @@ export async function POST(request: Request) {
     const fbPageId = pageId || (metaAccount.metadata as any)?.page_id || ''
     const destinationUrl = linkUrl || 'https://demonstracao.orbitgestao.com.br'
 
+    // Build naming convention
+    const objectiveLabels: Record<string, string> = {
+      lead_generation: 'Lead', traffic: 'Trafego', awareness: 'Awareness',
+      conversion: 'Conversao', engagement: 'Engajamento', retargeting: 'Retargeting',
+    }
+    const objLabel = objectiveLabels[campaign.campaign_type] || 'Lead'
+    const placementLabel = (!placementPreset || placementPreset === 'automatic') ? 'Automatico' : 'Manual'
+    const ageLabel = `${campaign.target_audience?.age_min || 25}-${campaign.target_audience?.age_max || 55}`
+    const audienceType = customAudiences?.length > 0 ? 'Custom' : 'Interesses'
+
+    const finalCampaignName = nameCampaign || `[Rodrigo][${placementLabel}][${objLabel}]`
+    const finalAdSetName = nameAdSet || `00-[${placementLabel}][${ageLabel}][${audienceType}]`
+    const finalAdPrefix = nameAd || `${objLabel}`
+
     // 3. Validate budget
     const dailyBudget = Number(campaign.budget_daily || 0)
     if (dailyBudget < 5) {
@@ -107,7 +124,7 @@ export async function POST(request: Request) {
     let metaCampaignId: string
     try {
       metaCampaignId = await createCampaign(config, {
-        name: campaign.name,
+        name: finalCampaignName,
         campaignType: campaign.campaign_type,
         dailyBudget,
         startTime: campaign.start_date || undefined,
@@ -126,7 +143,7 @@ export async function POST(request: Request) {
     let metaAdSetId: string
     try {
       metaAdSetId = await createAdSet(config, {
-        name: `${campaign.name} - Público`,
+        name: finalAdSetName,
         campaignId: metaCampaignId,
         campaignType: campaign.campaign_type,
         dailyBudget,
@@ -158,7 +175,7 @@ export async function POST(request: Request) {
         try {
           // Create creative
           const creativeId = await createAdCreative(config, {
-            name: `${campaign.name} - Creative ${i + 1}`,
+            name: `${finalAdPrefix} - Creative ${i + 1}`,
             pageId: fbPageId,
             headline: variant.headline || campaign.name,
             primaryText: variant.primary_text || variant.description || '',
@@ -169,7 +186,7 @@ export async function POST(request: Request) {
 
           // Create ad linking creative to adset
           const adId = await createAd(config, {
-            name: `${campaign.name} - Ad ${i + 1}`,
+            name: `${finalAdPrefix} - Ad ${String(i + 1).padStart(2, '0')}`,
             adSetId: metaAdSetId,
             creativeId,
           })
