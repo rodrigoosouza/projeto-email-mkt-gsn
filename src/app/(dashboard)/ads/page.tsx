@@ -113,6 +113,9 @@ export default function AdsPage() {
   const [publishCustomAudiences, setPublishCustomAudiences] = useState<string[]>([])
   const [accountInfo, setAccountInfo] = useState<{ audiences: any[]; pixels: any[]; pages: any[] } | null>(null)
   const [loadingAccountInfo, setLoadingAccountInfo] = useState(false)
+  const [publishNameCampaign, setPublishNameCampaign] = useState('')
+  const [publishNameAdSet, setPublishNameAdSet] = useState('')
+  const [publishNameAd, setPublishNameAd] = useState('')
 
   async function loadAccountInfo() {
     if (accountInfo || loadingAccountInfo || !orgId) return
@@ -143,6 +146,9 @@ export default function AdsPage() {
           placementPreset: publishPlacement,
           conversionLocation: publishConvLocation,
           customAudiences: publishCustomAudiences.length > 0 ? publishCustomAudiences : undefined,
+          nameCampaign: publishNameCampaign || undefined,
+          nameAdSet: publishNameAdSet || undefined,
+          nameAd: publishNameAd || undefined,
         }),
       })
       const data = await res.json()
@@ -557,6 +563,41 @@ export default function AdsPage() {
               {showPublishDialog && viewCampaign.platform === 'meta_ads' && !viewCampaign.platform_campaign_id && (
                 <div className="mt-4 p-4 border rounded-lg space-y-3 bg-blue-50 dark:bg-blue-950/30 max-h-[400px] overflow-y-auto">
                   <p className="text-sm font-medium">Configurar publicação no Meta Ads</p>
+
+                  {/* Nomenclatura */}
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold">Nomenclatura</Label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <Label className="text-[10px] text-muted-foreground">Campanha</Label>
+                        <Input
+                          placeholder="[Rodrigo][Automatico][Lead]"
+                          value={publishNameCampaign}
+                          onChange={e => setPublishNameCampaign(e.target.value)}
+                          className="h-7 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-[10px] text-muted-foreground">Conjunto</Label>
+                        <Input
+                          placeholder="00-[Manual][35-55][Interesses]"
+                          value={publishNameAdSet}
+                          onChange={e => setPublishNameAdSet(e.target.value)}
+                          className="h-7 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-[10px] text-muted-foreground">Anuncio</Label>
+                        <Input
+                          placeholder="Lead"
+                          value={publishNameAd}
+                          onChange={e => setPublishNameAd(e.target.value)}
+                          className="h-7 text-xs"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">Deixe vazio para usar padrao automatico</p>
+                  </div>
 
                   {/* Pixel / Dataset */}
                   <div className="space-y-1">
