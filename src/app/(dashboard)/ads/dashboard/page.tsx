@@ -172,7 +172,7 @@ export default function AdsDashboardPage() {
       map.set(i.campaign_name, existing)
     })
 
-    return [...map.values()].sort((a, b) => b.spend - a.spend)
+    return Array.from(map.values()).sort((a, b) => b.spend - a.spend)
   }, [filteredInsights])
 
   // Dados por dia (para o grafico de tendencia)
@@ -192,7 +192,7 @@ export default function AdsDashboardPage() {
       map.set(i.date, existing)
     })
 
-    return [...map.values()].sort((a, b) => a.date.localeCompare(b.date))
+    return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date))
   }, [insights, campaignFilter])
 
   if (loading) {
