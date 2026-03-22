@@ -34,21 +34,27 @@ export async function POST(request: Request) {
 
     const aspectRatio = FORMAT_ASPECT_RATIOS[format] || '1:1'
 
-    // Enhanced prompt for professional social media visuals
-    const enhancedPrompt = `Create a high-quality, professional social media image for Instagram.
+    // Enhanced prompt using the same approach as the video scene generator
+    // (detailed, cinematic, specific — the key to good Gemini image output)
+    const isVertical = aspectRatio === '9:16'
+    const isWide = aspectRatio === '16:9'
+    const orientation = isVertical ? 'Vertical 9:16' : isWide ? 'Horizontal 16:9' : 'Square 1:1'
 
-STYLE REQUIREMENTS:
-- Modern, clean, premium design aesthetic
-- Dark theme with gold (#D4A017) accent color preferred, or use vibrant gradients
-- NO text, NO words, NO letters, NO numbers on the image — the image must be purely visual
-- Professional photography or 3D render quality
-- Strong visual hierarchy and composition
-- Suitable for Instagram ${format === 'reels' || format === 'stories' ? 'Stories/Reels (vertical)' : 'Feed (square)'}
+    const enhancedPrompt = `${orientation}, cinematic social media image, ultra high quality, 8K render.
 
-CONCEPT TO VISUALIZE:
-${imagePrompt}
+Scene: ${imagePrompt}
 
-IMPORTANT: Do NOT include any text, labels, titles, or watermarks. Create only a striking visual that conveys the concept through imagery, icons, or abstract representations. Think premium brand aesthetic like Apple, Tesla, or high-end consulting firms.`
+Style direction: Premium corporate aesthetic, dark moody background (#0D1117), selective gold (#D4A017) accent lighting. Clean composition with strong focal point. Depth of field, volumetric lighting, subtle lens flare. Professional color grading — deep blacks, rich contrast, warm gold highlights.
+
+Technical: Shot on Sony A7IV, 35mm f/1.4 lens, shallow depth of field. Studio lighting setup with key light at 45 degrees, rim light for separation. Post-processed in Lightroom with cinematic LUT.
+
+CRITICAL RULES:
+- ABSOLUTELY NO text, words, letters, numbers, labels, watermarks, or any written content in the image
+- No stock photo look — must feel authentic and premium
+- One clear subject/focal point
+- Rich detail and texture
+- Professional business/corporate context
+- If showing people: confident, professional, diverse, natural expressions`
 
     // Generate image via OpenRouter
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
