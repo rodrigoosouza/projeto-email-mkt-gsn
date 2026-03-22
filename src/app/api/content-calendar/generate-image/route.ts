@@ -34,6 +34,22 @@ export async function POST(request: Request) {
 
     const aspectRatio = FORMAT_ASPECT_RATIOS[format] || '1:1'
 
+    // Enhanced prompt for professional social media visuals
+    const enhancedPrompt = `Create a high-quality, professional social media image for Instagram.
+
+STYLE REQUIREMENTS:
+- Modern, clean, premium design aesthetic
+- Dark theme with gold (#D4A017) accent color preferred, or use vibrant gradients
+- NO text, NO words, NO letters, NO numbers on the image — the image must be purely visual
+- Professional photography or 3D render quality
+- Strong visual hierarchy and composition
+- Suitable for Instagram ${format === 'reels' || format === 'stories' ? 'Stories/Reels (vertical)' : 'Feed (square)'}
+
+CONCEPT TO VISUALIZE:
+${imagePrompt}
+
+IMPORTANT: Do NOT include any text, labels, titles, or watermarks. Create only a striking visual that conveys the concept through imagery, icons, or abstract representations. Think premium brand aesthetic like Apple, Tesla, or high-end consulting firms.`
+
     // Generate image via OpenRouter
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -43,8 +59,8 @@ export async function POST(request: Request) {
         'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'https://plataforma-email.vercel.app',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-image',
-        messages: [{ role: 'user', content: imagePrompt }],
+        model: 'google/gemini-2.5-flash-preview-05-20',
+        messages: [{ role: 'user', content: enhancedPrompt }],
         modalities: ['image', 'text'],
         image_config: {
           aspect_ratio: aspectRatio,
