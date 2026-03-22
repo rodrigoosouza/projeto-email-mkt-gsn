@@ -258,13 +258,12 @@ export default function AdsDashboardPage() {
     if (!orgId) return
     setSyncing(true)
     try {
-      const res = await fetch('/api/meta-ads/sync', {
+      const res = await fetch('https://tnpzoklepkvktbqouctf.supabase.co/functions/v1/sync-meta-ads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           orgId,
-          daysBack: 30,
-          syncLevels: ['campaigns'],
+          daysBack: 3,
         }),
       })
       const data = await res.json()
