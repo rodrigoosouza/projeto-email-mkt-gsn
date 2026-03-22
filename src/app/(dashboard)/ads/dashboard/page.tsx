@@ -107,12 +107,12 @@ export default function AdsDashboardPage() {
 
   // Filtros
   const dates = useMemo(() => {
-    const uniqueDates = [...new Set(insights.map((i) => i.date))].sort().reverse()
+    const uniqueDates = Array.from(new Set(insights.map((i) => i.date))).sort().reverse()
     return uniqueDates
   }, [insights])
 
   const campaigns = useMemo(() => {
-    const uniqueCampaigns = [...new Set(insights.map((i) => i.campaign_name))]
+    const uniqueCampaigns = Array.from(new Set(insights.map((i) => i.campaign_name)))
     return uniqueCampaigns.sort()
   }, [insights])
 
