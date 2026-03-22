@@ -22,7 +22,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
     }
 
-    const { campaignId, pageId, linkUrl } = await request.json()
+    const { campaignId, pageId, linkUrl, pixelId, placementPreset, conversionLocation, customAudiences } = await request.json()
     if (!campaignId) {
       return NextResponse.json({ error: 'campaignId é obrigatório' }, { status: 400 })
     }
@@ -52,15 +52,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Status "${campaign.status}" não permite publicação` }, { status: 400 })
     }
 
-    // 2. Fetch Meta account for this org
-    const { data: metaAccount, error: metaError } = await admin
+    // 2. Fetch Meta account for this org (pick the main one, not read-only)
+    const { data: metaAccounts } = await admin
       .from('meta_ad_accounts')
-      .select('access_token, ad_account_id, page_id')
+      .select('access_token, ad_account_id, ad_account_name, metadata')
       .eq('org_id', campaign.org_id)
       .eq('status', 'active')
-      .single()
+      .order('created_at', { ascending: false })
 
-    if (metaError || !metaAccount) {
+    // Prefer the account without "Read-Only" in name
+    const metaAccount = metaAccounts?.find(a => !a.ad_account_name?.includes('Read-Only'))
+      || metaAccounts?.[0]
+
+    if (!metaAccount) {
       return NextResponse.json({ error: 'Conta Meta Ads não configurada ou inativa para esta organização' }, { status: 400 })
     }
 
@@ -71,7 +75,7 @@ export async function POST(request: Request) {
         : `act_${metaAccount.ad_account_id}`,
     }
 
-    const fbPageId = pageId || metaAccount.page_id || ''
+    const fbPageId = pageId || (metaAccount.metadata as any)?.page_id || ''
     const destinationUrl = linkUrl || 'https://demonstracao.orbitgestao.com.br'
 
     // 3. Validate budget
@@ -91,10 +95,11 @@ export async function POST(request: Request) {
       }
     }
 
-    // 5. Build targeting with resolved interests
+    // 5. Build targeting with resolved interests + custom audiences
     const targetingInput = {
       ...targetAudience,
       interest_ids: interestIds.length > 0 ? interestIds : undefined,
+      custom_audiences: customAudiences || undefined,
     }
     const targeting = buildMetaTargeting(targetingInput)
 
@@ -128,6 +133,9 @@ export async function POST(request: Request) {
         targeting,
         startTime: campaign.start_date || undefined,
         endTime: campaign.end_date || undefined,
+        pixelId: pixelId || undefined,
+        placementPreset: placementPreset || 'feed_stories_reels',
+        conversionLocation: conversionLocation || 'WEBSITE',
       })
     } catch (error: any) {
       try { await deleteCampaign(config, metaCampaignId) } catch { /* ignore */ }

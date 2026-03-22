@@ -261,7 +261,12 @@ async function postMeta(url: string, params: Record<string, string>): Promise<an
   })
   const data = await response.json()
   if (data.error) {
-    throw new Error(`Meta API Error: ${data.error.message} (code: ${data.error.code})`)
+    const msg = data.error.message || 'Unknown error'
+    const code = data.error.code || 0
+    const subcode = data.error.error_subcode || ''
+    const fbTraceId = data.error.fbtrace_id || ''
+    console.error('[Meta API Error]', JSON.stringify(data.error, null, 2))
+    throw new Error(`Meta API Error: ${msg} (code: ${code}${subcode ? `, subcode: ${subcode}` : ''}${fbTraceId ? `, trace: ${fbTraceId}` : ''})`)
   }
   return data
 }
@@ -270,11 +275,21 @@ async function postMeta(url: string, params: Record<string, string>): Promise<an
 export function buildMetaTargeting(targetAudience: any): Record<string, any> {
   const targeting: Record<string, any> = {}
 
-  // Geo
+  // Geo — support countries, regions (states), cities
   const locations = targetAudience?.locations || ['Brasil']
   const countryMap: Record<string, string> = { 'Brasil': 'BR', 'Brazil': 'BR', 'USA': 'US', 'Estados Unidos': 'US' }
-  const countries = locations.map((l: string) => countryMap[l] || 'BR')
-  targeting.geo_locations = { countries }
+  const geoLocations: Record<string, any> = {}
+
+  // Check if we have region keys (states)
+  if (targetAudience?.regions && targetAudience.regions.length > 0) {
+    geoLocations.regions = targetAudience.regions // [{ key: "3847" }] format
+  } else if (targetAudience?.cities && targetAudience.cities.length > 0) {
+    geoLocations.cities = targetAudience.cities // [{ key: "123", radius: 40 }] format
+  } else {
+    const countries = locations.map((l: string) => countryMap[l] || 'BR')
+    geoLocations.countries = countries
+  }
+  targeting.geo_locations = geoLocations
 
   // Age
   targeting.age_min = targetAudience?.age_min || 25
@@ -294,7 +309,88 @@ export function buildMetaTargeting(targetAudience: any): Record<string, any> {
     }]
   }
 
+  // Custom audiences (remarketing, lookalike, etc)
+  if (targetAudience?.custom_audiences && targetAudience.custom_audiences.length > 0) {
+    targeting.custom_audiences = targetAudience.custom_audiences.map((id: string) => ({ id }))
+  }
+
+  // Excluded custom audiences
+  if (targetAudience?.excluded_custom_audiences && targetAudience.excluded_custom_audiences.length > 0) {
+    targeting.excluded_custom_audiences = targetAudience.excluded_custom_audiences.map((id: string) => ({ id }))
+  }
+
+  // Required by Meta: Advantage+ audience flag (0 = disabled, use manual targeting)
+  targeting.targeting_automation = { advantage_audience: 0 }
+
   return targeting
+}
+
+// Placement positions mapping
+export const PLACEMENT_PRESETS: Record<string, any> = {
+  automatic: {}, // Meta Advantage+ placements (empty = auto)
+  feed_only: {
+    publisher_platforms: ['facebook', 'instagram'],
+    facebook_positions: ['feed'],
+    instagram_positions: ['stream'],
+  },
+  feed_stories: {
+    publisher_platforms: ['facebook', 'instagram'],
+    facebook_positions: ['feed', 'story'],
+    instagram_positions: ['stream', 'story', 'reels'],
+  },
+  feed_stories_reels: {
+    publisher_platforms: ['facebook', 'instagram'],
+    facebook_positions: ['feed', 'story', 'marketplace'],
+    instagram_positions: ['stream', 'story', 'reels', 'explore'],
+  },
+  instagram_only: {
+    publisher_platforms: ['instagram'],
+    instagram_positions: ['stream', 'story', 'reels', 'explore'],
+  },
+  stories_reels: {
+    publisher_platforms: ['facebook', 'instagram'],
+    facebook_positions: ['story'],
+    instagram_positions: ['story', 'reels'],
+  },
+}
+
+// Conversion event mapping by campaign type
+export const CAMPAIGN_TYPE_TO_CONVERSION_EVENT: Record<string, string> = {
+  lead_generation: 'Lead',
+  conversion: 'Purchase',
+  traffic: 'ViewContent',
+  retargeting: 'Lead',
+}
+
+// Get custom audiences from an ad account
+export async function getCustomAudiences(config: MetaAdsConfig): Promise<{ id: string; name: string; subtype: string }[]> {
+  const params = new URLSearchParams({
+    access_token: config.access_token,
+    fields: 'id,name,subtype',
+    limit: '100',
+  })
+  const data = await fetchAllPages(`${META_API_BASE}/${config.ad_account_id}/customaudiences?${params}`)
+  return data.map((a: any) => ({ id: a.id, name: a.name, subtype: a.subtype }))
+}
+
+// Get pixel/dataset ID from ad account
+export async function getPixels(config: MetaAdsConfig): Promise<{ id: string; name: string }[]> {
+  const params = new URLSearchParams({
+    access_token: config.access_token,
+    fields: 'id,name',
+  })
+  const data = await fetchAllPages(`${META_API_BASE}/${config.ad_account_id}/adspixels?${params}`)
+  return data.map((p: any) => ({ id: p.id, name: p.name }))
+}
+
+// Get Facebook pages linked to ad account
+export async function getPromotePages(config: MetaAdsConfig): Promise<{ id: string; name: string }[]> {
+  const params = new URLSearchParams({
+    access_token: config.access_token,
+    fields: 'id,name',
+  })
+  const data = await fetchAllPages(`${META_API_BASE}/${config.ad_account_id}/promote_pages?${params}`)
+  return data.map((p: any) => ({ id: p.id, name: p.name }))
 }
 
 // Search for interest targeting options (text → Meta interest IDs)
@@ -484,15 +580,10 @@ export async function createCampaign(
     objective,
     status: 'PAUSED',
     special_ad_categories: '[]',
+    // Budget is set at adset level, so we must specify these flags
+    is_adset_budget_sharing_enabled: 'true',
+    bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
   }
-
-  if (params.dailyBudget) {
-    // Meta expects budget in cents
-    body.daily_budget = String(Math.round(params.dailyBudget * 100))
-  }
-
-  if (params.startTime) body.start_time = params.startTime
-  if (params.stopTime) body.stop_time = params.stopTime
 
   const result = await postMeta(
     `${META_API_BASE}/${config.ad_account_id}/campaigns`,
@@ -513,9 +604,15 @@ export async function createAdSet(
     targeting: Record<string, any>
     startTime?: string
     endTime?: string
+    pixelId?: string  // dataset/pixel for conversion tracking
+    placementPreset?: string // key from PLACEMENT_PRESETS
+    conversionLocation?: string // WEBSITE, APP, MESSAGING, INSTANT_FORM
   }
 ): Promise<string> {
   const optimizationGoal = CAMPAIGN_TYPE_TO_OPTIMIZATION_GOAL[params.campaignType] || 'LEAD_GENERATION'
+
+  // Default start time: 1 hour from now (Meta requires future date)
+  const defaultStart = new Date(Date.now() + 60 * 60 * 1000).toISOString()
 
   const body: Record<string, string> = {
     access_token: config.access_token,
@@ -527,10 +624,33 @@ export async function createAdSet(
     optimization_goal: optimizationGoal,
     bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
     targeting: JSON.stringify(params.targeting),
+    start_time: params.startTime || defaultStart,
   }
 
-  if (params.startTime) body.start_time = params.startTime
   if (params.endTime) body.end_time = params.endTime
+
+  // Pixel / Dataset for conversion tracking
+  if (params.pixelId) {
+    const convEvent = CAMPAIGN_TYPE_TO_CONVERSION_EVENT[params.campaignType] || 'Lead'
+    body.promoted_object = JSON.stringify({
+      pixel_id: params.pixelId,
+      custom_event_type: convEvent === 'Lead' ? 'LEAD' : convEvent === 'Purchase' ? 'PURCHASE' : 'OTHER',
+    })
+  }
+
+  // Conversion location (destination_type)
+  if (params.conversionLocation) {
+    body.destination_type = params.conversionLocation
+  }
+
+  // Placements
+  const placementKey = params.placementPreset || 'automatic'
+  const placements = PLACEMENT_PRESETS[placementKey]
+  if (placements && Object.keys(placements).length > 0) {
+    if (placements.publisher_platforms) body.publisher_platforms = JSON.stringify(placements.publisher_platforms)
+    if (placements.facebook_positions) body.facebook_positions = JSON.stringify(placements.facebook_positions)
+    if (placements.instagram_positions) body.instagram_positions = JSON.stringify(placements.instagram_positions)
+  }
 
   const result = await postMeta(
     `${META_API_BASE}/${config.ad_account_id}/adsets`,

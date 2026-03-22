@@ -107,6 +107,27 @@ export default function AdsPage() {
   const [showPublishDialog, setShowPublishDialog] = useState(false)
   const [publishPageId, setPublishPageId] = useState('')
   const [publishLinkUrl, setPublishLinkUrl] = useState('https://demonstracao.orbitgestao.com.br')
+  const [publishPixelId, setPublishPixelId] = useState('')
+  const [publishPlacement, setPublishPlacement] = useState('feed_stories_reels')
+  const [publishConvLocation, setPublishConvLocation] = useState('WEBSITE')
+  const [publishCustomAudiences, setPublishCustomAudiences] = useState<string[]>([])
+  const [accountInfo, setAccountInfo] = useState<{ audiences: any[]; pixels: any[]; pages: any[] } | null>(null)
+  const [loadingAccountInfo, setLoadingAccountInfo] = useState(false)
+
+  async function loadAccountInfo() {
+    if (accountInfo || loadingAccountInfo || !orgId) return
+    setLoadingAccountInfo(true)
+    try {
+      const res = await fetch(`/api/meta-ads/account-info?orgId=${orgId}`)
+      const data = await res.json()
+      if (res.ok) {
+        setAccountInfo(data)
+        if (data.pixels?.[0]) setPublishPixelId(data.pixels[0].id)
+        if (data.pages?.[0]) setPublishPageId(data.pages[0].id)
+      }
+    } catch { /* ignore */ }
+    finally { setLoadingAccountInfo(false) }
+  }
 
   async function handlePublish(campaignId: string) {
     setPublishing(campaignId)
@@ -118,6 +139,10 @@ export default function AdsPage() {
           campaignId,
           pageId: publishPageId || undefined,
           linkUrl: publishLinkUrl || undefined,
+          pixelId: publishPixelId || undefined,
+          placementPreset: publishPlacement,
+          conversionLocation: publishConvLocation,
+          customAudiences: publishCustomAudiences.length > 0 ? publishCustomAudiences : undefined,
         }),
       })
       const data = await res.json()
@@ -530,30 +555,105 @@ export default function AdsPage() {
 
               {/* Publish form */}
               {showPublishDialog && viewCampaign.platform === 'meta_ads' && !viewCampaign.platform_campaign_id && (
-                <div className="mt-4 p-4 border rounded-lg space-y-3 bg-blue-50 dark:bg-blue-950/30">
-                  <p className="text-sm font-medium">Configurar publicação</p>
-                  <div className="space-y-2">
-                    <Label htmlFor="pageId" className="text-xs">Facebook Page ID (opcional)</Label>
-                    <Input
-                      id="pageId"
-                      placeholder="Ex: 123456789 (ID da página do Facebook)"
-                      value={publishPageId}
-                      onChange={(e) => setPublishPageId(e.target.value)}
-                      className="h-8 text-sm"
-                    />
-                    <p className="text-xs text-muted-foreground">Se informado, cria os anúncios com os textos da estratégia automaticamente.</p>
+                <div className="mt-4 p-4 border rounded-lg space-y-3 bg-blue-50 dark:bg-blue-950/30 max-h-[400px] overflow-y-auto">
+                  <p className="text-sm font-medium">Configurar publicação no Meta Ads</p>
+
+                  {/* Pixel / Dataset */}
+                  <div className="space-y-1">
+                    <Label className="text-xs">Conjunto de dados (Pixel)</Label>
+                    {accountInfo?.pixels && accountInfo.pixels.length > 0 ? (
+                      <Select value={publishPixelId} onValueChange={setPublishPixelId}>
+                        <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Selecione o pixel" /></SelectTrigger>
+                        <SelectContent>
+                          {accountInfo.pixels.map(p => (
+                            <SelectItem key={p.id} value={p.id}>{p.name} ({p.id})</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input placeholder="ID do Pixel" value={publishPixelId} onChange={e => setPublishPixelId(e.target.value)} className="h-8 text-sm" />
+                    )}
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="linkUrl" className="text-xs">URL de destino</Label>
-                    <Input
-                      id="linkUrl"
-                      placeholder="https://..."
-                      value={publishLinkUrl}
-                      onChange={(e) => setPublishLinkUrl(e.target.value)}
-                      className="h-8 text-sm"
-                    />
+
+                  {/* Conversion location */}
+                  <div className="space-y-1">
+                    <Label className="text-xs">Local da conversão</Label>
+                    <Select value={publishConvLocation} onValueChange={setPublishConvLocation}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="WEBSITE">Site (Website)</SelectItem>
+                        <SelectItem value="APP">Aplicativo</SelectItem>
+                        <SelectItem value="MESSAGING">Mensagens</SelectItem>
+                        <SelectItem value="ON_AD">No anuncio (Formulario instantaneo)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <div className="flex gap-2">
+
+                  {/* Facebook Page */}
+                  <div className="space-y-1">
+                    <Label className="text-xs">Pagina do Facebook</Label>
+                    {accountInfo?.pages && accountInfo.pages.length > 0 ? (
+                      <Select value={publishPageId} onValueChange={setPublishPageId}>
+                        <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Selecione a pagina" /></SelectTrigger>
+                        <SelectContent>
+                          {accountInfo.pages.map(p => (
+                            <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input placeholder="Page ID" value={publishPageId} onChange={e => setPublishPageId(e.target.value)} className="h-8 text-sm" />
+                    )}
+                    <p className="text-xs text-muted-foreground">Se informado, cria anuncios com os textos da estrategia.</p>
+                  </div>
+
+                  {/* URL de destino */}
+                  <div className="space-y-1">
+                    <Label className="text-xs">URL de destino</Label>
+                    <Input value={publishLinkUrl} onChange={e => setPublishLinkUrl(e.target.value)} className="h-8 text-sm" />
+                  </div>
+
+                  {/* Posicionamento */}
+                  <div className="space-y-1">
+                    <Label className="text-xs">Posicionamento</Label>
+                    <Select value={publishPlacement} onValueChange={setPublishPlacement}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="automatic">Automatico (Advantage+)</SelectItem>
+                        <SelectItem value="feed_only">Apenas Feed</SelectItem>
+                        <SelectItem value="feed_stories">Feed + Stories</SelectItem>
+                        <SelectItem value="feed_stories_reels">Feed + Stories + Reels</SelectItem>
+                        <SelectItem value="instagram_only">Apenas Instagram</SelectItem>
+                        <SelectItem value="stories_reels">Apenas Stories + Reels</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Públicos personalizados */}
+                  {accountInfo?.audiences && accountInfo.audiences.length > 0 && (
+                    <div className="space-y-1">
+                      <Label className="text-xs">Publicos personalizados (opcional)</Label>
+                      <div className="max-h-[120px] overflow-y-auto space-y-1 border rounded p-2 bg-white dark:bg-gray-900">
+                        {accountInfo.audiences.map(a => (
+                          <label key={a.id} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-muted/50 p-1 rounded">
+                            <input
+                              type="checkbox"
+                              checked={publishCustomAudiences.includes(a.id)}
+                              onChange={e => {
+                                if (e.target.checked) setPublishCustomAudiences(prev => [...prev, a.id])
+                                else setPublishCustomAudiences(prev => prev.filter(id => id !== a.id))
+                              }}
+                              className="rounded"
+                            />
+                            <span className="truncate">{a.name}</span>
+                            <Badge variant="secondary" className="text-[10px] ml-auto shrink-0">{a.subtype}</Badge>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 pt-2">
                     <Button
                       size="sm"
                       onClick={() => handlePublish(viewCampaign.id)}
@@ -579,7 +679,7 @@ export default function AdsPage() {
                   !showPublishDialog &&
                   ['draft', 'ready'].includes(viewCampaign.status) && (
                   <Button
-                    onClick={() => setShowPublishDialog(true)}
+                    onClick={() => { setShowPublishDialog(true); loadAccountInfo() }}
                     className="bg-blue-600 hover:bg-blue-700"
                   >
                     <Upload className="mr-2 h-4 w-4" /> Publicar no Meta Ads
