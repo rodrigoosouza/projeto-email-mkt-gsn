@@ -243,8 +243,9 @@ export const CAMPAIGN_TYPE_TO_META_OBJECTIVE: Record<string, string> = {
 }
 
 // Optimization goal mapping
+// Note: LEAD_GENERATION is deprecated for OUTCOME_LEADS campaigns — use OFFSITE_CONVERSIONS
 export const CAMPAIGN_TYPE_TO_OPTIMIZATION_GOAL: Record<string, string> = {
-  lead_generation: 'LEAD_GENERATION',
+  lead_generation: 'OFFSITE_CONVERSIONS',
   traffic: 'LINK_CLICKS',
   awareness: 'REACH',
   conversion: 'OFFSITE_CONVERSIONS',
