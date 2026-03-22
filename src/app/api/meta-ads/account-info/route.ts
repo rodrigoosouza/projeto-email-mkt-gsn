@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { searchInterests } from '@/lib/analytics/meta-ads-client'
+import { getCustomAudiences, getPixels, getPromotePages } from '@/lib/analytics/meta-ads-client'
 
 export async function GET(request: Request) {
   try {
@@ -12,17 +12,15 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url)
-    const query = searchParams.get('q')
     const orgId = searchParams.get('orgId')
-
-    if (!query || !orgId) {
-      return NextResponse.json({ error: 'q e orgId são obrigatórios' }, { status: 400 })
+    if (!orgId) {
+      return NextResponse.json({ error: 'orgId é obrigatório' }, { status: 400 })
     }
 
     const admin = createAdminClient()
     const { data: metaAccounts } = await admin
       .from('meta_ad_accounts')
-      .select('access_token, ad_account_name')
+      .select('access_token, ad_account_id, ad_account_name')
       .eq('org_id', orgId)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
@@ -34,9 +32,20 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Conta Meta não configurada' }, { status: 400 })
     }
 
-    const results = await searchInterests(metaAccount.access_token, query)
+    const config = {
+      access_token: metaAccount.access_token,
+      ad_account_id: metaAccount.ad_account_id.startsWith('act_')
+        ? metaAccount.ad_account_id
+        : `act_${metaAccount.ad_account_id}`,
+    }
 
-    return NextResponse.json({ interests: results })
+    const [audiences, pixels, pages] = await Promise.all([
+      getCustomAudiences(config).catch(() => []),
+      getPixels(config).catch(() => []),
+      getPromotePages(config).catch(() => []),
+    ])
+
+    return NextResponse.json({ audiences, pixels, pages })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
