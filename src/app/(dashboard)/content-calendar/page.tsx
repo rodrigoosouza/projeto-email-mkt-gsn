@@ -78,6 +78,8 @@ export default function ContentCalendarPage() {
   const [generating, setGenerating] = useState(false)
   const [editingPost, setEditingPost] = useState<ContentPost | null>(null)
   const [generatingImage, setGeneratingImage] = useState<string | null>(null)
+  const [imageFormatChoice, setImageFormatChoice] = useState<'1:1' | '9:16' | '16:9'>('1:1')
+  const [fullscreenImage, setFullscreenImage] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
 
   const [year, month] = currentMonth.split('-').map(Number)
@@ -380,23 +382,50 @@ export default function ContentCalendarPage() {
                 {/* Generated images */}
                 {editingPost.image_urls && editingPost.image_urls.length > 0 && (
                   <div>
-                    <Label className="text-xs text-muted-foreground">Imagens Geradas</Label>
+                    <Label className="text-xs text-muted-foreground">Imagens Geradas ({editingPost.image_urls.length})</Label>
                     <div className="grid grid-cols-2 gap-2 mt-2">
                       {editingPost.image_urls.map((url: string, i: number) => (
-                        <img key={i} src={url} alt={`Imagem ${i + 1}`} className="w-full rounded-lg border" />
+                        <div key={i} className="relative group cursor-pointer" onClick={() => setFullscreenImage(url)}>
+                          <img src={url} alt={`Imagem ${i + 1}`} className="w-full rounded-lg border hover:opacity-90 transition-opacity" />
+                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30 rounded-lg">
+                            <span className="text-white text-xs font-medium bg-black/60 px-2 py-1 rounded">Tela cheia</span>
+                          </div>
+                        </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* Image prompt + generate button */}
+                {/* Image prompt + format selector + generate button */}
                 {editingPost.image_prompt && (
-                  <div className="space-y-2">
+                  <div className="space-y-3 p-3 border rounded-lg bg-muted/30">
                     <Label className="text-xs text-muted-foreground">Prompt de Imagem</Label>
                     <p className="text-sm text-muted-foreground italic">{editingPost.image_prompt}</p>
+
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs whitespace-nowrap">Tamanho:</Label>
+                      <div className="flex gap-1">
+                        {([
+                          { value: '1:1', label: 'Feed (1:1)', icon: '⬜' },
+                          { value: '9:16', label: 'Story (9:16)', icon: '📱' },
+                          { value: '16:9', label: 'Wide (16:9)', icon: '🖥️' },
+                        ] as const).map(opt => (
+                          <Button
+                            key={opt.value}
+                            type="button"
+                            size="sm"
+                            variant={imageFormatChoice === opt.value ? 'default' : 'outline'}
+                            onClick={() => setImageFormatChoice(opt.value)}
+                            className="h-7 text-xs"
+                          >
+                            {opt.icon} {opt.label}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+
                     <Button
                       size="sm"
-                      variant="outline"
                       disabled={generatingImage === editingPost.id}
                       onClick={async () => {
                         setGeneratingImage(editingPost.id)
@@ -407,13 +436,12 @@ export default function ContentCalendarPage() {
                             body: JSON.stringify({
                               postId: editingPost.id,
                               imagePrompt: editingPost.image_prompt,
-                              format: editingPost.format,
+                              format: imageFormatChoice === '9:16' ? 'reels' : imageFormatChoice === '16:9' ? 'video-longo' : 'post-estatico',
                             }),
                           })
                           const data = await res.json()
                           if (!res.ok) throw new Error(data.error)
                           toast({ title: 'Imagem gerada!' })
-                          // Update local state with new images
                           setEditingPost({
                             ...editingPost,
                             image_urls: [...(editingPost.image_urls || []), ...data.imageUrls],
@@ -425,13 +453,14 @@ export default function ContentCalendarPage() {
                           setGeneratingImage(null)
                         }
                       }}
+                      className="w-full"
                     >
                       {generatingImage === editingPost.id ? (
-                        <><Loader2 className="mr-2 h-3 w-3 animate-spin" /> Gerando imagem...</>
+                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Gerando imagem...</>
                       ) : editingPost.image_urls?.length > 0 ? (
-                        <><RefreshCw className="mr-2 h-3 w-3" /> Gerar nova imagem</>
+                        <><RefreshCw className="mr-2 h-4 w-4" /> Gerar nova variacao</>
                       ) : (
-                        <><ImageIcon className="mr-2 h-3 w-3" /> Gerar Imagem com IA</>
+                        <><ImageIcon className="mr-2 h-4 w-4" /> Gerar Imagem com IA</>
                       )}
                     </Button>
                   </div>
@@ -441,6 +470,35 @@ export default function ContentCalendarPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Fullscreen Image Modal */}
+      {fullscreenImage && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center cursor-pointer"
+          onClick={() => setFullscreenImage(null)}
+        >
+          <button
+            className="absolute top-4 right-4 text-white hover:text-gray-300 text-2xl font-bold z-10"
+            onClick={() => setFullscreenImage(null)}
+          >
+            ✕
+          </button>
+          <img
+            src={fullscreenImage}
+            alt="Imagem em tela cheia"
+            className="max-w-[95vw] max-h-[95vh] object-contain rounded-lg"
+            onClick={e => e.stopPropagation()}
+          />
+          <a
+            href={fullscreenImage}
+            download
+            className="absolute bottom-4 right-4 bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm backdrop-blur-sm"
+            onClick={e => e.stopPropagation()}
+          >
+            Baixar imagem
+          </a>
+        </div>
+      )}
 
       {/* Create Post Dialog */}
       <CreatePostDialog

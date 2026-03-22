@@ -181,6 +181,7 @@ export async function POST(request: Request) {
 
     // 9. Create ads from copy_variants (if page ID available)
     const createdAds: { name: string; ad_id: string; creative_id: string }[] = []
+    const adErrors: { ad: number; error: string }[] = []
     const copyVariants = campaign.copy_variants || []
 
     if (fbPageId && copyVariants.length > 0) {
@@ -209,6 +210,7 @@ export async function POST(request: Request) {
           createdAds.push({ name: `Ad ${i + 1}`, ad_id: adId, creative_id: creativeId })
         } catch (error: any) {
           console.error(`Failed to create ad ${i + 1}:`, error.message)
+          adErrors.push({ ad: i + 1, error: error.message })
         }
       }
     } else if (fbPageId && (uploadedImageHash || imageUrl)) {
@@ -247,6 +249,8 @@ export async function POST(request: Request) {
           meta_campaign_id: metaCampaignId,
           meta_adset_id: metaAdSetId,
           meta_ads: createdAds,
+          ad_errors: adErrors.length > 0 ? adErrors : undefined,
+          image_hash: uploadedImageHash || undefined,
           interests_resolved: interestIds,
           published_at: new Date().toISOString(),
           published_by: user.id,
@@ -258,16 +262,20 @@ export async function POST(request: Request) {
       .eq('id', campaignId)
 
     const adsMsg = createdAds.length > 0
-      ? `${createdAds.length} anúncio(s) criado(s) com os textos da estratégia.`
-      : 'Adicione os criativos (imagens/vídeos) no Ads Manager.'
+      ? `${createdAds.length} anúncio(s) criado(s).`
+      : 'Anúncios não criados — adicione criativos no Ads Manager.'
+    const errMsg = adErrors.length > 0
+      ? ` Erros: ${adErrors.map(e => e.error).join('; ')}`
+      : ''
 
     return NextResponse.json({
       success: true,
       meta_campaign_id: metaCampaignId,
       meta_adset_id: metaAdSetId,
       ads_created: createdAds.length,
+      ad_errors: adErrors,
       interests_resolved: interestIds.length,
-      message: `Campanha publicada no Meta Ads (PAUSADA). ${adsMsg} Ative quando estiver pronto.`,
+      message: `Campanha publicada no Meta Ads (PAUSADA). ${adsMsg}${errMsg}`,
     })
   } catch (error: any) {
     console.error('Publish campaign error:', error)

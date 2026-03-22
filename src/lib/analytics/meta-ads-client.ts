@@ -644,13 +644,15 @@ export async function createAdSet(
     body.destination_type = params.conversionLocation
   }
 
-  // Placements
+  // Placements — must be inside the targeting JSON, not separate params
   const placementKey = params.placementPreset || 'automatic'
   const placements = PLACEMENT_PRESETS[placementKey]
   if (placements && Object.keys(placements).length > 0) {
-    if (placements.publisher_platforms) body.publisher_platforms = JSON.stringify(placements.publisher_platforms)
-    if (placements.facebook_positions) body.facebook_positions = JSON.stringify(placements.facebook_positions)
-    if (placements.instagram_positions) body.instagram_positions = JSON.stringify(placements.instagram_positions)
+    const targetingObj = JSON.parse(body.targeting)
+    if (placements.publisher_platforms) targetingObj.publisher_platforms = placements.publisher_platforms
+    if (placements.facebook_positions) targetingObj.facebook_positions = placements.facebook_positions
+    if (placements.instagram_positions) targetingObj.instagram_positions = placements.instagram_positions
+    body.targeting = JSON.stringify(targetingObj)
   }
 
   const result = await postMeta(
