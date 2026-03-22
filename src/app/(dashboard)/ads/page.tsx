@@ -56,6 +56,8 @@ import {
   deleteAdCampaign,
   type AdCampaign,
 } from '@/lib/supabase/ad-campaigns'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Rascunho',
@@ -102,6 +104,9 @@ export default function AdsPage() {
   const [genObjective, setGenObjective] = useState('lead_generation')
   const [viewCampaign, setViewCampaign] = useState<AdCampaign | null>(null)
   const [publishing, setPublishing] = useState<string | null>(null)
+  const [showPublishDialog, setShowPublishDialog] = useState(false)
+  const [publishPageId, setPublishPageId] = useState('')
+  const [publishLinkUrl, setPublishLinkUrl] = useState('https://demonstracao.orbitgestao.com.br')
 
   async function handlePublish(campaignId: string) {
     setPublishing(campaignId)
@@ -109,7 +114,11 @@ export default function AdsPage() {
       const res = await fetch('/api/meta-ads/campaigns/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ campaignId }),
+        body: JSON.stringify({
+          campaignId,
+          pageId: publishPageId || undefined,
+          linkUrl: publishLinkUrl || undefined,
+        }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
@@ -118,6 +127,7 @@ export default function AdsPage() {
         description: data.message,
       })
       setViewCampaign(null)
+      setShowPublishDialog(false)
       loadCampaigns()
     } catch (error: any) {
       toast({
@@ -501,8 +511,14 @@ export default function AdsPage() {
                   <p className="text-sm font-medium text-green-700 dark:text-green-300 flex items-center gap-2">
                     <Facebook className="h-4 w-4" /> Publicada no Meta Ads
                   </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {(viewCampaign.performance_data as any)?.ads_created || 0} anúncio(s) criados
+                    {(viewCampaign.performance_data as any)?.interests_resolved?.length > 0 && (
+                      <> · {(viewCampaign.performance_data as any).interests_resolved.length} interesses mapeados</>
+                    )}
+                  </p>
                   <a
-                    href={`https://business.facebook.com/adsmanager/manage/campaigns?act=${viewCampaign.performance_data?.meta_campaign_id || ''}&selected_campaign_ids=${viewCampaign.platform_campaign_id}`}
+                    href={`https://business.facebook.com/adsmanager/manage/campaigns?act=${(viewCampaign.performance_data as any)?.meta_campaign_id || ''}&selected_campaign_ids=${viewCampaign.platform_campaign_id}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs text-blue-600 hover:underline flex items-center gap-1 mt-1"
@@ -511,23 +527,65 @@ export default function AdsPage() {
                   </a>
                 </div>
               )}
+
+              {/* Publish form */}
+              {showPublishDialog && viewCampaign.platform === 'meta_ads' && !viewCampaign.platform_campaign_id && (
+                <div className="mt-4 p-4 border rounded-lg space-y-3 bg-blue-50 dark:bg-blue-950/30">
+                  <p className="text-sm font-medium">Configurar publicação</p>
+                  <div className="space-y-2">
+                    <Label htmlFor="pageId" className="text-xs">Facebook Page ID (opcional)</Label>
+                    <Input
+                      id="pageId"
+                      placeholder="Ex: 123456789 (ID da página do Facebook)"
+                      value={publishPageId}
+                      onChange={(e) => setPublishPageId(e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground">Se informado, cria os anúncios com os textos da estratégia automaticamente.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="linkUrl" className="text-xs">URL de destino</Label>
+                    <Input
+                      id="linkUrl"
+                      placeholder="https://..."
+                      value={publishLinkUrl}
+                      onChange={(e) => setPublishLinkUrl(e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => handlePublish(viewCampaign.id)}
+                      disabled={publishing === viewCampaign.id}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      {publishing === viewCampaign.id ? (
+                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Publicando...</>
+                      ) : (
+                        <><Upload className="mr-2 h-4 w-4" /> Confirmar Publicação</>
+                      )}
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setShowPublishDialog(false)}>
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               <DialogFooter>
                 {viewCampaign.platform === 'meta_ads' &&
                   !viewCampaign.platform_campaign_id &&
+                  !showPublishDialog &&
                   ['draft', 'ready'].includes(viewCampaign.status) && (
                   <Button
-                    onClick={() => handlePublish(viewCampaign.id)}
-                    disabled={publishing === viewCampaign.id}
+                    onClick={() => setShowPublishDialog(true)}
                     className="bg-blue-600 hover:bg-blue-700"
                   >
-                    {publishing === viewCampaign.id ? (
-                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Publicando...</>
-                    ) : (
-                      <><Upload className="mr-2 h-4 w-4" /> Publicar no Meta Ads</>
-                    )}
+                    <Upload className="mr-2 h-4 w-4" /> Publicar no Meta Ads
                   </Button>
                 )}
-                <Button variant="outline" onClick={() => setViewCampaign(null)}>
+                <Button variant="outline" onClick={() => { setViewCampaign(null); setShowPublishDialog(false) }}>
                   Fechar
                 </Button>
               </DialogFooter>

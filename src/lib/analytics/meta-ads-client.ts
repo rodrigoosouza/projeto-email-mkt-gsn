@@ -284,11 +284,185 @@ export function buildMetaTargeting(targetAudience: any): Record<string, any> {
   if (targetAudience?.gender === 'male') targeting.genders = [1]
   else if (targetAudience?.gender === 'female') targeting.genders = [2]
 
-  // Note: interest targeting requires Meta interest IDs (not text strings)
-  // For now we use broad targeting. Phase 2 will add interest search via
-  // GET /v22.0/search?type=adinterest&q={query} to resolve text → IDs
+  // Interest targeting (resolved IDs from searchInterests)
+  if (targetAudience?.interest_ids && targetAudience.interest_ids.length > 0) {
+    targeting.flexible_spec = [{
+      interests: targetAudience.interest_ids.map((i: { id: string; name: string }) => ({
+        id: i.id,
+        name: i.name,
+      })),
+    }]
+  }
 
   return targeting
+}
+
+// Search for interest targeting options (text → Meta interest IDs)
+export async function searchInterests(
+  accessToken: string,
+  query: string
+): Promise<{ id: string; name: string; audience_size_lower_bound: number; audience_size_upper_bound: number }[]> {
+  const params = new URLSearchParams({
+    access_token: accessToken,
+    type: 'adinterest',
+    q: query,
+    limit: '10',
+  })
+
+  const response = await fetch(`${META_API_BASE}/search?${params}`)
+  const data = await response.json()
+
+  if (data.error) {
+    throw new Error(`Meta Search API Error: ${data.error.message}`)
+  }
+
+  return (data.data || []).map((item: any) => ({
+    id: item.id,
+    name: item.name,
+    audience_size_lower_bound: item.audience_size_lower_bound || 0,
+    audience_size_upper_bound: item.audience_size_upper_bound || 0,
+  }))
+}
+
+// Resolve interest text strings to Meta IDs (batch)
+export async function resolveInterests(
+  accessToken: string,
+  interestTexts: string[]
+): Promise<{ id: string; name: string }[]> {
+  const resolved: { id: string; name: string }[] = []
+  for (const text of interestTexts) {
+    try {
+      const results = await searchInterests(accessToken, text)
+      if (results.length > 0) {
+        // Pick the best match (first result usually most relevant)
+        resolved.push({ id: results[0].id, name: results[0].name })
+      }
+    } catch {
+      // Skip interests that can't be resolved
+    }
+  }
+  return resolved
+}
+
+// Upload image from URL to Meta ad account (returns image hash)
+export async function uploadImageFromUrl(
+  config: MetaAdsConfig,
+  imageUrl: string
+): Promise<{ hash: string; url: string }> {
+  const body: Record<string, string> = {
+    access_token: config.access_token,
+    url: imageUrl,
+  }
+
+  const result = await postMeta(
+    `${META_API_BASE}/${config.ad_account_id}/adimages`,
+    body
+  )
+
+  // Response: { images: { bytes: { hash, url } } }
+  const images = result.images
+  const firstKey = Object.keys(images)[0]
+  return {
+    hash: images[firstKey].hash,
+    url: images[firstKey].url,
+  }
+}
+
+// Create an ad creative on Meta
+export async function createAdCreative(
+  config: MetaAdsConfig,
+  params: {
+    name: string
+    pageId: string // Facebook Page ID
+    imageHash?: string
+    imageUrl?: string
+    videoId?: string
+    headline: string
+    primaryText: string
+    description?: string
+    cta: string
+    linkUrl: string
+  }
+): Promise<string> {
+  const ctaMap: Record<string, string> = {
+    'Saiba Mais': 'LEARN_MORE',
+    'Cadastre-se': 'SIGN_UP',
+    'Inscrever-se': 'SIGN_UP',
+    'Quero o Teste': 'SIGN_UP',
+    'Descobrir Como': 'LEARN_MORE',
+    'Garantir Vaga': 'SIGN_UP',
+    'Agendar': 'BOOK_TRAVEL',
+    'Comprar': 'SHOP_NOW',
+    'Baixar': 'DOWNLOAD',
+    'Contato': 'CONTACT_US',
+  }
+
+  const ctaType = ctaMap[params.cta] || 'LEARN_MORE'
+
+  const objectStorySpec: Record<string, any> = {
+    page_id: params.pageId,
+    link_data: {
+      message: params.primaryText,
+      link: params.linkUrl,
+      name: params.headline,
+      description: params.description || '',
+      call_to_action: { type: ctaType, value: { link: params.linkUrl } },
+    },
+  }
+
+  if (params.imageHash) {
+    objectStorySpec.link_data.image_hash = params.imageHash
+  } else if (params.imageUrl) {
+    objectStorySpec.link_data.picture = params.imageUrl
+  }
+
+  if (params.videoId) {
+    objectStorySpec.video_data = {
+      video_id: params.videoId,
+      message: params.primaryText,
+      title: params.headline,
+      call_to_action: { type: ctaType, value: { link: params.linkUrl } },
+    }
+    delete objectStorySpec.link_data
+  }
+
+  const body: Record<string, string> = {
+    access_token: config.access_token,
+    name: params.name,
+    object_story_spec: JSON.stringify(objectStorySpec),
+  }
+
+  const result = await postMeta(
+    `${META_API_BASE}/${config.ad_account_id}/adcreatives`,
+    body
+  )
+
+  return result.id
+}
+
+// Create an ad on Meta (connects creative to adset)
+export async function createAd(
+  config: MetaAdsConfig,
+  params: {
+    name: string
+    adSetId: string
+    creativeId: string
+  }
+): Promise<string> {
+  const body: Record<string, string> = {
+    access_token: config.access_token,
+    name: params.name,
+    adset_id: params.adSetId,
+    creative: JSON.stringify({ creative_id: params.creativeId }),
+    status: 'PAUSED',
+  }
+
+  const result = await postMeta(
+    `${META_API_BASE}/${config.ad_account_id}/ads`,
+    body
+  )
+
+  return result.id
 }
 
 // Create a campaign on Meta Ads (returns campaign ID)
