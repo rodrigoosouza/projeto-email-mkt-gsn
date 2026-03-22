@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { Loader2, Search } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -17,11 +17,7 @@ import {
   useTrackingCampaigns,
   type TrackingCampaignData,
 } from '@/hooks/tracking'
-import {
-  TRACKING_ORGANIZATIONS,
-  getAllOrgTables,
-  getTrackingOrgById,
-} from '@/lib/tracking/organizations'
+import { getTrackingOrgByOrgId } from '@/lib/tracking/organizations'
 import type { OrgTables } from '@/lib/tracking/organizations'
 // DateRange from types includes 'custom', but we only use 7d/30d/90d here
 import {
@@ -35,14 +31,6 @@ import { useOrganizationContext } from '@/contexts/organization-context'
 
 type DateRangeOption = '7d' | '30d' | '90d'
 
-function orgNameToTrackingId(name: string): string {
-  const lower = name.toLowerCase()
-  if (lower.includes('templum')) return 'templum'
-  if (lower.includes('orbit')) return 'orbit'
-  if (lower.includes('evolutto')) return 'evolutto'
-  return 'all'
-}
-
 const DATE_RANGE_OPTIONS: { label: string; value: DateRangeOption }[] = [
   { label: '7 dias', value: '7d' },
   { label: '30 dias', value: '30d' },
@@ -52,20 +40,19 @@ const DATE_RANGE_OPTIONS: { label: string; value: DateRangeOption }[] = [
 export default function TrackingCampaignsPage() {
   const { currentOrg } = useOrganizationContext()
   const [dateRange, setDateRange] = useState<DateRangeOption>('30d')
-  const [selectedOrg, setSelectedOrg] = useState('all')
-
-  useEffect(() => {
-    if (currentOrg) setSelectedOrg(orgNameToTrackingId(currentOrg.name))
-  }, [currentOrg?.id])
   const [search, setSearch] = useState('')
 
-  const { startDate, endDate } = useMemo(() => getDateRange(dateRange), [dateRange])
+  const trackingOrg = useMemo(() => {
+    if (!currentOrg) return null
+    return getTrackingOrgByOrgId(currentOrg.id) || null
+  }, [currentOrg?.id])
 
   const orgTablesList: OrgTables[] = useMemo(() => {
-    if (selectedOrg === 'all') return getAllOrgTables()
-    const org = getTrackingOrgById(selectedOrg)
-    return org ? [org.tables] : getAllOrgTables()
-  }, [selectedOrg])
+    if (trackingOrg) return [trackingOrg.tables]
+    return []
+  }, [trackingOrg])
+
+  const { startDate, endDate } = useMemo(() => getDateRange(dateRange), [dateRange])
 
   const { campaigns, timeline, loading } = useTrackingCampaigns(
     startDate,
@@ -84,11 +71,6 @@ export default function TrackingCampaignsPage() {
     )
   }, [campaigns, search])
 
-  const ORG_OPTIONS = [
-    { id: 'all', name: 'Todas' },
-    ...TRACKING_ORGANIZATIONS.map((o) => ({ id: o.id, name: o.name })),
-  ]
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -100,19 +82,6 @@ export default function TrackingCampaignsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex gap-1 border rounded-md p-0.5">
-            {ORG_OPTIONS.map((org) => (
-              <Button
-                key={org.id}
-                variant={selectedOrg === org.id ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setSelectedOrg(org.id)}
-                className="text-xs h-7"
-              >
-                {org.name}
-              </Button>
-            ))}
-          </div>
           <div className="flex gap-1 border rounded-md p-0.5">
             {DATE_RANGE_OPTIONS.map((opt) => (
               <Button

@@ -173,9 +173,18 @@ export function SetupChecklist() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Erro no auto-setup')
 
+      const c = data.created
+      const parts = []
+      if (c.form) parts.push(`${c.form} formulario`)
+      if (c.templates) parts.push(`${c.templates} templates`)
+      if (c.campaigns) parts.push(`${c.campaigns} campanhas email`)
+      if (c.adCampaigns) parts.push(`${c.adCampaigns} campanhas ads`)
+      if (c.automationFlow) parts.push(`${c.automationFlow} automacao`)
+      if (c.calendarPosts) parts.push(`${c.calendarPosts} posts calendario`)
+
       toast({
         title: 'Setup automatico concluido!',
-        description: `Criados: ${data.created.form} formulario, ${data.created.templates} templates, ${data.created.campaign} campanha`,
+        description: `Criados: ${parts.join(', ')}. Revise e aprove tudo!`,
       })
 
       // Re-check setup status

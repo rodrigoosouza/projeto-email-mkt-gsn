@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useTrackingJourney } from '@/hooks/tracking'
-import { findTrackingOrgBySlug, getAllOrgTables } from '@/lib/tracking/organizations'
+import { findTrackingOrgBySlug, getTrackingOrgByOrgId, getAllOrgTables } from '@/lib/tracking/organizations'
 import {
   formatDate,
   formatDateTime,
@@ -28,20 +28,25 @@ interface LeadTrackingJourneyProps {
   email: string
   phone?: string | null
   orgSlug?: string
+  orgId?: string
 }
 
-export function LeadTrackingJourney({ email, phone, orgSlug }: LeadTrackingJourneyProps) {
+export function LeadTrackingJourney({ email, phone, orgSlug, orgId }: LeadTrackingJourneyProps) {
   const [expandedSessions, setExpandedSessions] = useState<string[]>([])
   const [showAll, setShowAll] = useState(false)
 
-  // Determine which org tables to query
+  // Determine which org tables to query — prefer orgId over orgSlug
   const orgTablesList = useMemo(() => {
+    if (orgId) {
+      const org = getTrackingOrgByOrgId(orgId)
+      if (org) return [org.tables]
+    }
     if (orgSlug) {
       const org = findTrackingOrgBySlug(orgSlug)
       if (org) return [org.tables]
     }
     return getAllOrgTables()
-  }, [orgSlug])
+  }, [orgId, orgSlug])
 
   const { lead, events, loading, error } = useTrackingJourney(email, orgTablesList, orgSlug, phone)
 

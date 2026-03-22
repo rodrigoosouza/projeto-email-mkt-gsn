@@ -21,6 +21,12 @@ const pageTitles: Record<string, string> = {
   '/templates': 'Templates de Email',
   '/campaigns': 'Campanhas',
   '/settings': 'Configuracoes',
+  '/ads/dashboard': 'Dashboard Meta Ads',
+  '/ads': 'Criar Campanha ADS',
+  '/pipedrive': 'CRM Funil',
+  '/pipedrive/': 'Deal',
+  '/growth': 'Analise de MKT e Vendas',
+  '/growth/chat': 'IA Growth Copilot',
 }
 
 interface HeaderProps {
