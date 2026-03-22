@@ -71,6 +71,26 @@ supabase/
 - Verificar `.skills/plataforma-email/references/existing-assets.md` para componentes reaproveitaveis
 - 29 componentes do tracking-dashboard podem ser adaptados
 
+### Meta Ads Integration
+- **App Meta:** App Orbit (ID: 749222631460522)
+- **Token:** Long-lived user token (60 dias, renovar antes de expirar)
+- **Ad Account Orbit:** `act_866448806166587` (conta principal com campanhas)
+- **Tabelas Supabase:**
+  - `meta_ad_accounts` — contas de anuncio conectadas por org (token, ad_account_id)
+  - `meta_campaign_insights` — metricas diarias por campanha (impressoes, cliques, spend, leads, CPL)
+  - `meta_adsets` — conjuntos de anuncio
+  - `meta_ads` — anuncios individuais
+  - `meta_adset_insights` — metricas diarias por adset
+  - `meta_ad_insights` — metricas diarias por anuncio
+  - `meta_sync_logs` — log de sincronizacao
+- **Dashboard:** `/ads/dashboard` — dashboard interativo com filtros por dia e campanha
+- **RLS:** Todas as tabelas meta_* tem RLS habilitado por org_id
+- **API Meta:** Graph API v22.0, endpoint insights com `time_increment=1` para dados diarios
+- **Organizacoes no Supabase:**
+  - Templum: `d7a3cbaa-6f5c-4f21-9326-03d9c30a6c7b`
+  - Evolutto: `657d0237-5a96-4dc4-bc9a-a3638278de04`
+  - Orbit Gestao: `aa652b9a-5a03-4c59-be37-8a81cd6ecdb9`
+
 ### Git
 - Branch strategy: main -> develop -> feature/xxx
 - Nunca commitar .env.local ou credentials/

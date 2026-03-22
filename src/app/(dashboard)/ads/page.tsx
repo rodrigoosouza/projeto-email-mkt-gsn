@@ -48,6 +48,7 @@ import {
 } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
 import { useOrganizationContext } from '@/contexts/organization-context'
+import Link from 'next/link'
 import {
   getAdCampaigns,
   deleteAdCampaign,
@@ -170,10 +171,18 @@ export default function AdsPage() {
             Gere campanhas de Meta Ads e Google Ads com IA baseadas na sua estrategia.
           </p>
         </div>
-        <Button onClick={() => setShowGenerate(true)}>
-          <Sparkles className="mr-2 h-4 w-4" />
-          Gerar Campanhas com IA
-        </Button>
+        <div className="flex gap-2">
+          <Link href="/ads/dashboard">
+            <Button variant="outline">
+              <TrendingUp className="mr-2 h-4 w-4" />
+              Dashboard ADS
+            </Button>
+          </Link>
+          <Button onClick={() => setShowGenerate(true)}>
+            <Sparkles className="mr-2 h-4 w-4" />
+            Gerar Campanhas com IA
+          </Button>
+        </div>
       </div>
 
       {/* KPIs */}
