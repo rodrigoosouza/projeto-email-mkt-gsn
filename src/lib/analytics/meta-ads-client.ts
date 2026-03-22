@@ -230,6 +230,150 @@ export function extractVideoPercent(actions: any[] | undefined): number {
   return parseInt(actions[0]?.value || '0', 10)
 }
 
+// === CAMPAIGN CREATION ===
+
+// Objective mapping: our campaign_type → Meta objective
+export const CAMPAIGN_TYPE_TO_META_OBJECTIVE: Record<string, string> = {
+  lead_generation: 'OUTCOME_LEADS',
+  traffic: 'OUTCOME_TRAFFIC',
+  awareness: 'OUTCOME_AWARENESS',
+  conversion: 'OUTCOME_SALES',
+  engagement: 'OUTCOME_ENGAGEMENT',
+  retargeting: 'OUTCOME_SALES',
+}
+
+// Optimization goal mapping
+export const CAMPAIGN_TYPE_TO_OPTIMIZATION_GOAL: Record<string, string> = {
+  lead_generation: 'LEAD_GENERATION',
+  traffic: 'LINK_CLICKS',
+  awareness: 'REACH',
+  conversion: 'OFFSITE_CONVERSIONS',
+  engagement: 'POST_ENGAGEMENT',
+  retargeting: 'OFFSITE_CONVERSIONS',
+}
+
+// POST helper for Meta Graph API
+async function postMeta(url: string, params: Record<string, string>): Promise<any> {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams(params).toString(),
+  })
+  const data = await response.json()
+  if (data.error) {
+    throw new Error(`Meta API Error: ${data.error.message} (code: ${data.error.code})`)
+  }
+  return data
+}
+
+// Build Meta targeting spec from our target_audience JSON
+export function buildMetaTargeting(targetAudience: any): Record<string, any> {
+  const targeting: Record<string, any> = {}
+
+  // Geo
+  const locations = targetAudience?.locations || ['Brasil']
+  const countryMap: Record<string, string> = { 'Brasil': 'BR', 'Brazil': 'BR', 'USA': 'US', 'Estados Unidos': 'US' }
+  const countries = locations.map((l: string) => countryMap[l] || 'BR')
+  targeting.geo_locations = { countries }
+
+  // Age
+  targeting.age_min = targetAudience?.age_min || 25
+  targeting.age_max = targetAudience?.age_max || 55
+
+  // Gender (0=all, 1=male, 2=female)
+  if (targetAudience?.gender === 'male') targeting.genders = [1]
+  else if (targetAudience?.gender === 'female') targeting.genders = [2]
+
+  // Note: interest targeting requires Meta interest IDs (not text strings)
+  // For now we use broad targeting. Phase 2 will add interest search via
+  // GET /v22.0/search?type=adinterest&q={query} to resolve text → IDs
+
+  return targeting
+}
+
+// Create a campaign on Meta Ads (returns campaign ID)
+export async function createCampaign(
+  config: MetaAdsConfig,
+  params: {
+    name: string
+    campaignType: string
+    dailyBudget?: number // in BRL (e.g. 80.00)
+    startTime?: string // ISO date
+    stopTime?: string  // ISO date
+  }
+): Promise<string> {
+  const objective = CAMPAIGN_TYPE_TO_META_OBJECTIVE[params.campaignType] || 'OUTCOME_LEADS'
+
+  const body: Record<string, string> = {
+    access_token: config.access_token,
+    name: params.name,
+    objective,
+    status: 'PAUSED',
+    special_ad_categories: '[]',
+  }
+
+  if (params.dailyBudget) {
+    // Meta expects budget in cents
+    body.daily_budget = String(Math.round(params.dailyBudget * 100))
+  }
+
+  if (params.startTime) body.start_time = params.startTime
+  if (params.stopTime) body.stop_time = params.stopTime
+
+  const result = await postMeta(
+    `${META_API_BASE}/${config.ad_account_id}/campaigns`,
+    body
+  )
+
+  return result.id
+}
+
+// Create an ad set on Meta Ads (returns adset ID)
+export async function createAdSet(
+  config: MetaAdsConfig,
+  params: {
+    name: string
+    campaignId: string
+    campaignType: string
+    dailyBudget: number // in BRL
+    targeting: Record<string, any>
+    startTime?: string
+    endTime?: string
+  }
+): Promise<string> {
+  const optimizationGoal = CAMPAIGN_TYPE_TO_OPTIMIZATION_GOAL[params.campaignType] || 'LEAD_GENERATION'
+
+  const body: Record<string, string> = {
+    access_token: config.access_token,
+    name: params.name,
+    campaign_id: params.campaignId,
+    status: 'PAUSED',
+    daily_budget: String(Math.round(params.dailyBudget * 100)),
+    billing_event: 'IMPRESSIONS',
+    optimization_goal: optimizationGoal,
+    bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
+    targeting: JSON.stringify(params.targeting),
+  }
+
+  if (params.startTime) body.start_time = params.startTime
+  if (params.endTime) body.end_time = params.endTime
+
+  const result = await postMeta(
+    `${META_API_BASE}/${config.ad_account_id}/adsets`,
+    body
+  )
+
+  return result.id
+}
+
+// Delete a campaign on Meta (for cleanup on partial failure)
+export async function deleteCampaign(config: MetaAdsConfig, campaignId: string): Promise<void> {
+  await postMeta(`${META_API_BASE}/${campaignId}`, {
+    access_token: config.access_token,
+    status: 'DELETED',
+  })
+}
+
 // Alias for backwards compatibility with /api/analytics/sync
 export async function getCampaignInsights(config: MetaAdsConfig, since: string, until: string) {
   return getInsights(config, {

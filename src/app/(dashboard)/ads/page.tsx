@@ -14,6 +14,8 @@ import {
   TrendingUp,
   Facebook,
   Search,
+  Upload,
+  ExternalLink,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -99,6 +101,34 @@ export default function AdsPage() {
   const [genPlatform, setGenPlatform] = useState('all')
   const [genObjective, setGenObjective] = useState('lead_generation')
   const [viewCampaign, setViewCampaign] = useState<AdCampaign | null>(null)
+  const [publishing, setPublishing] = useState<string | null>(null)
+
+  async function handlePublish(campaignId: string) {
+    setPublishing(campaignId)
+    try {
+      const res = await fetch('/api/meta-ads/campaigns/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaignId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast({
+        title: 'Campanha publicada no Meta Ads',
+        description: data.message,
+      })
+      setViewCampaign(null)
+      loadCampaigns()
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao publicar',
+        description: error.message,
+        variant: 'destructive',
+      })
+    } finally {
+      setPublishing(null)
+    }
+  }
 
   useEffect(() => {
     if (!orgId) return
@@ -466,7 +496,37 @@ export default function AdsPage() {
                   </div>
                 )}
               </div>
+              {viewCampaign.platform_campaign_id && (
+                <div className="mt-4 p-3 bg-green-50 dark:bg-green-950 rounded-lg">
+                  <p className="text-sm font-medium text-green-700 dark:text-green-300 flex items-center gap-2">
+                    <Facebook className="h-4 w-4" /> Publicada no Meta Ads
+                  </p>
+                  <a
+                    href={`https://business.facebook.com/adsmanager/manage/campaigns?act=${viewCampaign.performance_data?.meta_campaign_id || ''}&selected_campaign_ids=${viewCampaign.platform_campaign_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-600 hover:underline flex items-center gap-1 mt-1"
+                  >
+                    Abrir no Ads Manager <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              )}
               <DialogFooter>
+                {viewCampaign.platform === 'meta_ads' &&
+                  !viewCampaign.platform_campaign_id &&
+                  ['draft', 'ready'].includes(viewCampaign.status) && (
+                  <Button
+                    onClick={() => handlePublish(viewCampaign.id)}
+                    disabled={publishing === viewCampaign.id}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    {publishing === viewCampaign.id ? (
+                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Publicando...</>
+                    ) : (
+                      <><Upload className="mr-2 h-4 w-4" /> Publicar no Meta Ads</>
+                    )}
+                  </Button>
+                )}
                 <Button variant="outline" onClick={() => setViewCampaign(null)}>
                   Fechar
                 </Button>
