@@ -4,11 +4,14 @@ import { createClient } from '@/lib/supabase/server'
 import {
   createCampaign,
   createAdSet,
+  createAdCreative,
+  createAd,
   deleteCampaign,
   buildMetaTargeting,
+  resolveInterests,
 } from '@/lib/analytics/meta-ads-client'
 
-export const maxDuration = 30
+export const maxDuration = 60
 
 export async function POST(request: Request) {
   try {
@@ -19,7 +22,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
     }
 
-    const { campaignId } = await request.json()
+    const { campaignId, pageId, linkUrl } = await request.json()
     if (!campaignId) {
       return NextResponse.json({ error: 'campaignId é obrigatório' }, { status: 400 })
     }
@@ -52,7 +55,7 @@ export async function POST(request: Request) {
     // 2. Fetch Meta account for this org
     const { data: metaAccount, error: metaError } = await admin
       .from('meta_ad_accounts')
-      .select('access_token, ad_account_id')
+      .select('access_token, ad_account_id, page_id')
       .eq('org_id', campaign.org_id)
       .eq('status', 'active')
       .single()
@@ -68,16 +71,34 @@ export async function POST(request: Request) {
         : `act_${metaAccount.ad_account_id}`,
     }
 
+    const fbPageId = pageId || metaAccount.page_id || ''
+    const destinationUrl = linkUrl || 'https://demonstracao.orbitgestao.com.br'
+
     // 3. Validate budget
     const dailyBudget = Number(campaign.budget_daily || 0)
     if (dailyBudget < 5) {
       return NextResponse.json({ error: 'Orçamento diário mínimo é R$ 5,00' }, { status: 400 })
     }
 
-    // 4. Build targeting
-    const targeting = buildMetaTargeting(campaign.target_audience || {})
+    // 4. Resolve interest targeting (text → Meta IDs)
+    const targetAudience = campaign.target_audience || {}
+    let interestIds: { id: string; name: string }[] = []
+    if (targetAudience.interests && targetAudience.interests.length > 0) {
+      try {
+        interestIds = await resolveInterests(config.access_token, targetAudience.interests)
+      } catch {
+        // Continue without interests if resolution fails
+      }
+    }
 
-    // 5. Create campaign on Meta
+    // 5. Build targeting with resolved interests
+    const targetingInput = {
+      ...targetAudience,
+      interest_ids: interestIds.length > 0 ? interestIds : undefined,
+    }
+    const targeting = buildMetaTargeting(targetingInput)
+
+    // 6. Create campaign on Meta
     let metaCampaignId: string
     try {
       metaCampaignId = await createCampaign(config, {
@@ -96,7 +117,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Erro ao criar campanha no Meta: ${error.message}` }, { status: 500 })
     }
 
-    // 6. Create ad set on Meta
+    // 7. Create ad set on Meta
     let metaAdSetId: string
     try {
       metaAdSetId = await createAdSet(config, {
@@ -109,10 +130,7 @@ export async function POST(request: Request) {
         endTime: campaign.end_date || undefined,
       })
     } catch (error: any) {
-      // Cleanup: delete the campaign we just created
-      try {
-        await deleteCampaign(config, metaCampaignId)
-      } catch { /* ignore cleanup errors */ }
+      try { await deleteCampaign(config, metaCampaignId) } catch { /* ignore */ }
 
       await admin
         .from('ad_campaigns')
@@ -122,7 +140,41 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Erro ao criar conjunto de anúncios: ${error.message}` }, { status: 500 })
     }
 
-    // 7. Update campaign in database
+    // 8. Create ads from copy_variants (if page ID available)
+    const createdAds: { name: string; ad_id: string; creative_id: string }[] = []
+    const copyVariants = campaign.copy_variants || []
+
+    if (fbPageId && copyVariants.length > 0) {
+      for (let i = 0; i < copyVariants.length; i++) {
+        const variant = copyVariants[i]
+        try {
+          // Create creative
+          const creativeId = await createAdCreative(config, {
+            name: `${campaign.name} - Creative ${i + 1}`,
+            pageId: fbPageId,
+            headline: variant.headline || campaign.name,
+            primaryText: variant.primary_text || variant.description || '',
+            description: variant.description || '',
+            cta: variant.cta || 'Saiba Mais',
+            linkUrl: destinationUrl,
+          })
+
+          // Create ad linking creative to adset
+          const adId = await createAd(config, {
+            name: `${campaign.name} - Ad ${i + 1}`,
+            adSetId: metaAdSetId,
+            creativeId,
+          })
+
+          createdAds.push({ name: `Ad ${i + 1}`, ad_id: adId, creative_id: creativeId })
+        } catch (error: any) {
+          // Don't fail the whole publish if one ad fails
+          console.error(`Failed to create ad ${i + 1}:`, error.message)
+        }
+      }
+    }
+
+    // 9. Update campaign in database
     await admin
       .from('ad_campaigns')
       .update({
@@ -131,18 +183,28 @@ export async function POST(request: Request) {
         performance_data: {
           meta_campaign_id: metaCampaignId,
           meta_adset_id: metaAdSetId,
+          meta_ads: createdAds,
+          interests_resolved: interestIds,
           published_at: new Date().toISOString(),
           published_by: user.id,
           targeting_used: targeting,
+          page_id: fbPageId,
+          link_url: destinationUrl,
         },
       })
       .eq('id', campaignId)
+
+    const adsMsg = createdAds.length > 0
+      ? `${createdAds.length} anúncio(s) criado(s) com os textos da estratégia.`
+      : 'Adicione os criativos (imagens/vídeos) no Ads Manager.'
 
     return NextResponse.json({
       success: true,
       meta_campaign_id: metaCampaignId,
       meta_adset_id: metaAdSetId,
-      message: 'Campanha e conjunto de anúncios criados no Meta Ads (PAUSADOS). Adicione os criativos no Ads Manager para ativar.',
+      ads_created: createdAds.length,
+      interests_resolved: interestIds.length,
+      message: `Campanha publicada no Meta Ads (PAUSADA). ${adsMsg} Ative quando estiver pronto.`,
     })
   } catch (error: any) {
     console.error('Publish campaign error:', error)
