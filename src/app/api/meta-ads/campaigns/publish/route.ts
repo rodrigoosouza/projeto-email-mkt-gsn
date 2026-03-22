@@ -9,6 +9,7 @@ import {
   deleteCampaign,
   buildMetaTargeting,
   resolveInterests,
+  uploadImageFromUrl,
 } from '@/lib/analytics/meta-ads-client'
 
 export const maxDuration = 60
@@ -25,6 +26,7 @@ export async function POST(request: Request) {
     const {
       campaignId, pageId, linkUrl, pixelId, placementPreset, conversionLocation, customAudiences,
       nameCampaign, nameAdSet, nameAd,
+      imageUrl, videoUrl,
     } = await request.json()
     if (!campaignId) {
       return NextResponse.json({ error: 'campaignId é obrigatório' }, { status: 400 })
@@ -165,7 +167,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Erro ao criar conjunto de anúncios: ${error.message}` }, { status: 500 })
     }
 
-    // 8. Create ads from copy_variants (if page ID available)
+    // 8. Upload image if provided
+    let uploadedImageHash: string | undefined
+    if (imageUrl) {
+      try {
+        const uploaded = await uploadImageFromUrl(config, imageUrl)
+        uploadedImageHash = uploaded.hash
+      } catch (error: any) {
+        console.error('Image upload failed:', error.message)
+        // Continue without image — will create ad without it if page is set
+      }
+    }
+
+    // 9. Create ads from copy_variants (if page ID available)
     const createdAds: { name: string; ad_id: string; creative_id: string }[] = []
     const copyVariants = campaign.copy_variants || []
 
@@ -173,10 +187,12 @@ export async function POST(request: Request) {
       for (let i = 0; i < copyVariants.length; i++) {
         const variant = copyVariants[i]
         try {
-          // Create creative
           const creativeId = await createAdCreative(config, {
-            name: `${finalAdPrefix} - Creative ${i + 1}`,
+            name: `${finalAdPrefix} - Creative ${String(i + 1).padStart(2, '0')}`,
             pageId: fbPageId,
+            imageHash: uploadedImageHash,
+            imageUrl: !uploadedImageHash && imageUrl ? imageUrl : undefined,
+            videoId: videoUrl || undefined, // Note: for videos, user needs to provide the Meta video ID
             headline: variant.headline || campaign.name,
             primaryText: variant.primary_text || variant.description || '',
             description: variant.description || '',
@@ -184,7 +200,6 @@ export async function POST(request: Request) {
             linkUrl: destinationUrl,
           })
 
-          // Create ad linking creative to adset
           const adId = await createAd(config, {
             name: `${finalAdPrefix} - Ad ${String(i + 1).padStart(2, '0')}`,
             adSetId: metaAdSetId,
@@ -193,9 +208,32 @@ export async function POST(request: Request) {
 
           createdAds.push({ name: `Ad ${i + 1}`, ad_id: adId, creative_id: creativeId })
         } catch (error: any) {
-          // Don't fail the whole publish if one ad fails
           console.error(`Failed to create ad ${i + 1}:`, error.message)
         }
+      }
+    } else if (fbPageId && (uploadedImageHash || imageUrl)) {
+      // No copy variants but has image — create one ad with campaign name
+      try {
+        const creativeId = await createAdCreative(config, {
+          name: `${finalAdPrefix} - Creative 01`,
+          pageId: fbPageId,
+          imageHash: uploadedImageHash,
+          imageUrl: !uploadedImageHash ? imageUrl : undefined,
+          headline: campaign.name,
+          primaryText: campaign.objective || campaign.name,
+          cta: 'Saiba Mais',
+          linkUrl: destinationUrl,
+        })
+
+        const adId = await createAd(config, {
+          name: `${finalAdPrefix} - Ad 01`,
+          adSetId: metaAdSetId,
+          creativeId,
+        })
+
+        createdAds.push({ name: 'Ad 1', ad_id: adId, creative_id: creativeId })
+      } catch (error: any) {
+        console.error('Failed to create ad:', error.message)
       }
     }
 

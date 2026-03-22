@@ -116,6 +116,38 @@ export default function AdsPage() {
   const [publishNameCampaign, setPublishNameCampaign] = useState('')
   const [publishNameAdSet, setPublishNameAdSet] = useState('')
   const [publishNameAd, setPublishNameAd] = useState('')
+  const [publishImageUrl, setPublishImageUrl] = useState('')
+  const [publishVideoUrl, setPublishVideoUrl] = useState('')
+  const [publishCreativeType, setPublishCreativeType] = useState<'image' | 'video'>('image')
+  const [publishImagePreview, setPublishImagePreview] = useState('')
+  const [uploadingFile, setUploadingFile] = useState(false)
+
+  async function handleFileUpload(file: File) {
+    setUploadingFile(true)
+    try {
+      // Upload to Supabase storage and get public URL
+      const supabase = (await import('@/lib/supabase/client')).createClient()
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+      const fileName = `${orgId}/${Date.now()}-${safeName}`
+      const { error } = await supabase.storage.from('ad-creatives').upload(fileName, file, { upsert: true })
+      if (error) throw error
+      const { data: urlData } = supabase.storage.from('ad-creatives').getPublicUrl(fileName)
+      const publicUrl = urlData.publicUrl
+
+      if (file.type.startsWith('video/')) {
+        setPublishVideoUrl(publicUrl)
+        setPublishCreativeType('video')
+      } else {
+        setPublishImageUrl(publicUrl)
+        setPublishImagePreview(URL.createObjectURL(file))
+        setPublishCreativeType('image')
+      }
+    } catch (error: any) {
+      toast({ title: 'Erro no upload', description: error.message, variant: 'destructive' })
+    } finally {
+      setUploadingFile(false)
+    }
+  }
 
   async function loadAccountInfo() {
     if (accountInfo || loadingAccountInfo || !orgId) return
@@ -149,6 +181,8 @@ export default function AdsPage() {
           nameCampaign: publishNameCampaign || undefined,
           nameAdSet: publishNameAdSet || undefined,
           nameAd: publishNameAd || undefined,
+          imageUrl: publishImageUrl || undefined,
+          videoUrl: publishVideoUrl || undefined,
         }),
       })
       const data = await res.json()
@@ -693,6 +727,79 @@ export default function AdsPage() {
                       </div>
                     </div>
                   )}
+
+                  {/* Criativo (upload imagem ou video) */}
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold">Criativo do anuncio</Label>
+
+                    {/* Upload area */}
+                    <div className="border-2 border-dashed rounded-lg p-3 text-center hover:border-blue-400 transition-colors">
+                      <input
+                        type="file"
+                        accept="image/*,video/*"
+                        className="hidden"
+                        id="creative-upload"
+                        onChange={e => {
+                          const file = e.target.files?.[0]
+                          if (file) handleFileUpload(file)
+                        }}
+                      />
+                      <label htmlFor="creative-upload" className="cursor-pointer">
+                        {uploadingFile ? (
+                          <div className="flex items-center justify-center gap-2 py-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span className="text-xs">Enviando...</span>
+                          </div>
+                        ) : publishImagePreview || publishImageUrl ? (
+                          <div className="space-y-2">
+                            <img
+                              src={publishImagePreview || publishImageUrl}
+                              alt="Preview"
+                              className="w-full max-h-40 object-contain rounded"
+                              onError={e => (e.currentTarget.style.display = 'none')}
+                            />
+                            <p className="text-[10px] text-muted-foreground">Clique para trocar a imagem</p>
+                          </div>
+                        ) : publishVideoUrl ? (
+                          <div className="py-2">
+                            <p className="text-xs text-green-600 font-medium">Video enviado</p>
+                            <p className="text-[10px] text-muted-foreground truncate">{publishVideoUrl.split('/').pop()}</p>
+                            <p className="text-[10px] text-muted-foreground mt-1">Clique para trocar</p>
+                          </div>
+                        ) : (
+                          <div className="py-3">
+                            <Upload className="h-6 w-6 mx-auto text-muted-foreground mb-1" />
+                            <p className="text-xs text-muted-foreground">Clique para enviar imagem ou video</p>
+                            <p className="text-[10px] text-muted-foreground mt-1">JPG, PNG, MP4 — Recomendado: 1080x1080 (Feed) ou 1080x1920 (Stories)</p>
+                          </div>
+                        )}
+                      </label>
+                    </div>
+
+                    {/* Ou colar URL */}
+                    <details className="text-xs">
+                      <summary className="text-muted-foreground cursor-pointer hover:text-foreground">Ou colar URL da imagem/video</summary>
+                      <div className="mt-2 space-y-2">
+                        <Input
+                          placeholder="https://...jpg ou .mp4"
+                          value={publishCreativeType === 'image' ? publishImageUrl : publishVideoUrl}
+                          onChange={e => {
+                            const val = e.target.value
+                            if (val.match(/\.(mp4|mov|webm)/i)) {
+                              setPublishVideoUrl(val); setPublishCreativeType('video')
+                            } else {
+                              setPublishImageUrl(val); setPublishCreativeType('image'); setPublishImagePreview('')
+                            }
+                          }}
+                          className="h-7 text-xs"
+                        />
+                      </div>
+                    </details>
+
+                    {!publishImageUrl && !publishVideoUrl && (
+                      <p className="text-xs text-amber-600">Sem criativo, sera criada campanha + conjunto apenas.</p>
+                    )}
+                  </div>
 
                   <div className="flex gap-2 pt-2">
                     <Button
