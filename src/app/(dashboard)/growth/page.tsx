@@ -6,6 +6,8 @@ import {
   Loader2, DollarSign, TrendingUp, Users, Target, MousePointerClick,
   Eye, ArrowRight, Clock, CheckCircle2, RefreshCw,
   Image, Layers, Video, BarChart3, ArrowDown, Percent,
+  Globe, Monitor, Smartphone, Tablet, MapPin, Zap, FileText,
+  Activity, Timer,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -108,6 +110,9 @@ export default function GrowthAnalysisPage() {
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [dateFilter, setDateFilter] = useState<DateFilter>('30d')
+  const [ga4Data, setGa4Data] = useState<any>(null)
+  const [ga4Loading, setGa4Loading] = useState(false)
+  const [ga4Error, setGa4Error] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
     if (!orgId) { setLoading(false); return }
@@ -132,6 +137,44 @@ export default function GrowthAnalysisPage() {
   }, [orgId])
 
   useEffect(() => { if (orgId) loadData() }, [orgId, loadData])
+
+  // GA4 date mapping
+  const ga4DateMap = useMemo((): Record<DateFilter, { start: string; end: string }> => {
+    const now = new Date()
+    const y = now.getFullYear(), m = now.getMonth()
+    const lmDate = new Date(y, m - 1, 1) // handles Jan→Dec previous year
+    const lmY = lmDate.getFullYear(), lmM = lmDate.getMonth() + 1
+    const lmDays = new Date(lmY, lmDate.getMonth() + 1, 0).getDate()
+    return {
+      today: { start: 'today', end: 'today' },
+      yesterday: { start: 'yesterday', end: 'yesterday' },
+      '7d': { start: '7daysAgo', end: 'today' },
+      '30d': { start: '30daysAgo', end: 'today' },
+      this_month: { start: `${y}-${String(m+1).padStart(2,'0')}-01`, end: 'today' },
+      last_month: { start: `${lmY}-${String(lmM).padStart(2,'0')}-01`, end: `${lmY}-${String(lmM).padStart(2,'0')}-${String(lmDays).padStart(2,'0')}` },
+      all: { start: '365daysAgo', end: 'today' },
+    }
+  }, [])
+
+  const loadGA4 = useCallback(async () => {
+    setGa4Loading(true)
+    setGa4Error(null)
+    try {
+      const { start, end } = ga4DateMap[dateFilter]
+      const res = await fetch(`/api/analytics/ga4?startDate=${start}&endDate=${end}`)
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Erro ao carregar GA4')
+      }
+      const data = await res.json()
+      setGa4Data(data)
+    } catch (e: any) {
+      console.error('GA4 load error:', e)
+      setGa4Error(e.message || 'Erro ao carregar dados do Google Analytics')
+    } finally {
+      setGa4Loading(false)
+    }
+  }, [dateFilter])
 
   const handleSync = async () => {
     if (!orgId) return; setSyncing(true)
@@ -306,6 +349,7 @@ export default function GrowthAnalysisPage() {
           <TabsTrigger value="audiences" className="gap-1.5 text-xs"><Layers className="h-3.5 w-3.5" /> Publicos</TabsTrigger>
           <TabsTrigger value="crm_creatives" className="gap-1.5 text-xs"><TrendingUp className="h-3.5 w-3.5" /> Criativos no CRM</TabsTrigger>
           <TabsTrigger value="crm_funnel" className="gap-1.5 text-xs"><Target className="h-3.5 w-3.5" /> Funil CRM</TabsTrigger>
+          <TabsTrigger value="ga4" className="gap-1.5 text-xs" onClick={() => { if (!ga4Data && !ga4Loading) loadGA4() }}><Globe className="h-3.5 w-3.5" /> Google Analytics</TabsTrigger>
         </TabsList>
 
         {/* === CRIATIVOS META ADS === */}
@@ -541,6 +585,286 @@ export default function GrowthAnalysisPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* === GOOGLE ANALYTICS === */}
+        <TabsContent value="ga4" className="space-y-4">
+          {ga4Loading && (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <span className="ml-2 text-sm text-muted-foreground">Carregando dados do Google Analytics...</span>
+            </div>
+          )}
+
+          {ga4Error && !ga4Loading && (
+            <Card className="border-destructive/50">
+              <CardContent className="p-6 text-center">
+                <p className="text-sm text-destructive font-medium mb-2">Erro ao carregar Google Analytics</p>
+                <p className="text-xs text-muted-foreground mb-4">{ga4Error}</p>
+                <Button size="sm" variant="outline" onClick={loadGA4}>
+                  <RefreshCw className="mr-2 h-3.5 w-3.5" /> Tentar novamente
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {!ga4Loading && !ga4Error && !ga4Data && (
+            <Card>
+              <CardContent className="p-6 text-center">
+                <Globe className="h-10 w-10 text-muted-foreground/50 mx-auto mb-3" />
+                <p className="text-sm text-muted-foreground mb-4">Clique para carregar os dados do Google Analytics</p>
+                <Button size="sm" onClick={loadGA4}>
+                  <Globe className="mr-2 h-3.5 w-3.5" /> Carregar GA4
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {!ga4Loading && ga4Data && (() => {
+            const ov = ga4Data.overview || {}
+            const sources: any[] = ga4Data.sources || []
+            const pages: any[] = ga4Data.pages || []
+            const geo: any[] = ga4Data.geography || []
+            const devices: any[] = ga4Data.devices || []
+            const events: any[] = ga4Data.events || []
+            const totalDeviceSessions = devices.reduce((s: number, d: any) => s + (d.sessions || 0), 0)
+            const maxSourceSessions = Math.max(...sources.map((s: any) => s.sessions || 0), 1)
+            const maxPageViews = Math.max(...pages.map((p: any) => p.pageViews || 0), 1)
+            const maxGeoSessions = Math.max(...geo.map((g: any) => g.sessions || 0), 1)
+            const maxEventCount = Math.max(...events.map((e: any) => e.count || 0), 1)
+
+            function fmtDuration(seconds: number) {
+              if (!seconds || seconds <= 0) return '0s'
+              const m = Math.floor(seconds / 60)
+              const s = Math.round(seconds % 60)
+              return m > 0 ? `${m}m ${s}s` : `${s}s`
+            }
+
+            const deviceIcons: Record<string, any> = { desktop: Monitor, mobile: Smartphone, tablet: Tablet }
+            const deviceColors: Record<string, string> = {
+              desktop: 'bg-blue-500',
+              mobile: 'bg-emerald-500',
+              tablet: 'bg-amber-500',
+            }
+
+            return (
+              <>
+                {/* KPI Cards */}
+                <div className="grid gap-3 grid-cols-2 lg:grid-cols-6">
+                  <KpiCard label="Sessoes" value={fmtN(ov.sessions || 0)} sub={`${fmtN(ov.engagedSessions || 0)} engajadas`} icon={Activity} color="text-blue-600" />
+                  <KpiCard label="Usuarios" value={fmtN(ov.totalUsers || 0)} sub={`${fmtN(ov.newUsers || 0)} novos`} icon={Users} color="text-indigo-600" />
+                  <KpiCard label="Paginas Vistas" value={fmtN(ov.pageViews || 0)} icon={FileText} color="text-sky-600" />
+                  <KpiCard label="Taxa Rejeicao" value={fmtP(ov.bounceRate ? ov.bounceRate * 100 : 0)} icon={ArrowDown} color="text-red-500" />
+                  <KpiCard label="Duracao Media" value={fmtDuration(ov.avgSessionDuration || 0)} icon={Timer} color="text-amber-600" />
+                  <KpiCard label="Conversoes" value={fmtN(ov.conversions || 0)} icon={CheckCircle2} color="text-emerald-600" />
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-2">
+                  {/* Traffic Sources */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-semibold flex items-center gap-2"><Globe className="h-4 w-4 text-blue-500" /> Fontes de Trafego</CardTitle>
+                      <CardDescription className="text-xs">Origem / Meio com sessoes e conversoes</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-muted/30">
+                              <TableHead className="text-xs pl-4">Origem / Meio</TableHead>
+                              <TableHead className="text-right text-xs">Sessoes</TableHead>
+                              <TableHead className="text-right text-xs">Usuarios</TableHead>
+                              <TableHead className="text-right text-xs">Conv.</TableHead>
+                              <TableHead className="text-right text-xs pr-4">Rejeicao</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {sources.slice(0, 12).map((s: any, i: number) => {
+                              const barW = Math.max((s.sessions / maxSourceSessions) * 100, 4)
+                              return (
+                                <TableRow key={`${s.source}-${s.medium}-${i}`}>
+                                  <TableCell className="pl-4">
+                                    <div className="space-y-1">
+                                      <span className="text-sm font-medium block">{s.source || '(direto)'} / {s.medium || '(none)'}</span>
+                                      <div className="h-1.5 rounded-full bg-muted overflow-hidden w-full max-w-[120px]">
+                                        <div className="h-full rounded-full bg-blue-500/60" style={{ width: `${barW}%` }} />
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-right text-sm font-semibold">{fmtN(s.sessions)}</TableCell>
+                                  <TableCell className="text-right text-sm text-muted-foreground">{fmtN(s.users)}</TableCell>
+                                  <TableCell className="text-right">
+                                    {s.conversions > 0
+                                      ? <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">{s.conversions}</span>
+                                      : <span className="text-xs text-muted-foreground">-</span>}
+                                  </TableCell>
+                                  <TableCell className="text-right text-sm text-muted-foreground pr-4">{fmtP(s.bounceRate ? s.bounceRate * 100 : 0)}</TableCell>
+                                </TableRow>
+                              )
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                      {sources.length === 0 && <p className="text-center text-muted-foreground py-8 text-sm">Sem dados de trafego no periodo</p>}
+                    </CardContent>
+                  </Card>
+
+                  {/* Top Pages */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-semibold flex items-center gap-2"><FileText className="h-4 w-4 text-sky-500" /> Paginas Mais Visitadas</CardTitle>
+                      <CardDescription className="text-xs">Paginas com mais visualizacoes</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-muted/30">
+                              <TableHead className="text-xs pl-4 min-w-[200px]">Pagina</TableHead>
+                              <TableHead className="text-right text-xs">Views</TableHead>
+                              <TableHead className="text-right text-xs">Usuarios</TableHead>
+                              <TableHead className="text-right text-xs">Rejeicao</TableHead>
+                              <TableHead className="text-right text-xs pr-4">Conv.</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {pages.slice(0, 12).map((p: any, i: number) => {
+                              const barW = Math.max((p.pageViews / maxPageViews) * 100, 4)
+                              return (
+                                <TableRow key={`${p.pagePath}-${i}`}>
+                                  <TableCell className="pl-4">
+                                    <div className="space-y-1">
+                                      <span className="text-sm font-medium block truncate max-w-[260px]" title={p.pagePath}>{p.pagePath}</span>
+                                      <div className="h-1.5 rounded-full bg-muted overflow-hidden w-full max-w-[120px]">
+                                        <div className="h-full rounded-full bg-sky-500/60" style={{ width: `${barW}%` }} />
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-right text-sm font-semibold">{fmtN(p.pageViews)}</TableCell>
+                                  <TableCell className="text-right text-sm text-muted-foreground">{fmtN(p.users)}</TableCell>
+                                  <TableCell className="text-right text-sm text-muted-foreground">{fmtP(p.bounceRate ? p.bounceRate * 100 : 0)}</TableCell>
+                                  <TableCell className="text-right pr-4">
+                                    {p.conversions > 0
+                                      ? <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">{p.conversions}</span>
+                                      : <span className="text-xs text-muted-foreground">-</span>}
+                                  </TableCell>
+                                </TableRow>
+                              )
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                      {pages.length === 0 && <p className="text-center text-muted-foreground py-8 text-sm">Sem dados de paginas no periodo</p>}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-3">
+                  {/* Geography */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-semibold flex items-center gap-2"><MapPin className="h-4 w-4 text-rose-500" /> Regioes</CardTitle>
+                      <CardDescription className="text-xs">Distribuicao geografica dos visitantes</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {geo.slice(0, 10).map((g: any, i: number) => {
+                          const barW = Math.max((g.sessions / maxGeoSessions) * 100, 6)
+                          return (
+                            <div key={`${g.region}-${i}`} className="flex items-center gap-3">
+                              <span className="text-xs font-medium w-[120px] truncate text-muted-foreground" title={g.region}>{g.region || '(nao definido)'}</span>
+                              <div className="flex-1">
+                                <div className="h-6 rounded-md bg-rose-400/15 flex items-center px-2 transition-all" style={{ width: `${barW}%` }}>
+                                  <span className="text-[11px] font-bold whitespace-nowrap">{fmtN(g.sessions)}</span>
+                                </div>
+                              </div>
+                              {g.conversions > 0 && (
+                                <Badge variant="outline" className="text-[10px] py-0 h-4 shrink-0">{g.conversions} conv.</Badge>
+                              )}
+                            </div>
+                          )
+                        })}
+                        {geo.length === 0 && <p className="text-center text-muted-foreground py-4 text-sm">Sem dados</p>}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Devices */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-semibold flex items-center gap-2"><Monitor className="h-4 w-4 text-violet-500" /> Dispositivos</CardTitle>
+                      <CardDescription className="text-xs">Distribuicao por tipo de dispositivo</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {devices.map((d: any, i: number) => {
+                          const pct = totalDeviceSessions > 0 ? (d.sessions / totalDeviceSessions) * 100 : 0
+                          const DeviceIcon = deviceIcons[d.device?.toLowerCase()] || Monitor
+                          const barColor = deviceColors[d.device?.toLowerCase()] || 'bg-gray-500'
+                          return (
+                            <div key={`${d.device}-${i}`} className="space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <DeviceIcon className="h-4 w-4 text-muted-foreground" />
+                                  <span className="text-sm font-medium capitalize">{d.device || 'Outro'}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-bold">{fmtP(pct)}</span>
+                                  <span className="text-xs text-muted-foreground">({fmtN(d.sessions)})</span>
+                                </div>
+                              </div>
+                              <div className="h-2.5 rounded-full bg-muted overflow-hidden">
+                                <div className={cn('h-full rounded-full transition-all', barColor)} style={{ width: `${pct}%` }} />
+                              </div>
+                              {d.conversions > 0 && (
+                                <p className="text-[11px] text-muted-foreground">{d.conversions} conversoes</p>
+                              )}
+                            </div>
+                          )
+                        })}
+                        {devices.length === 0 && <p className="text-center text-muted-foreground py-4 text-sm">Sem dados</p>}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Top Events */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-semibold flex items-center gap-2"><Zap className="h-4 w-4 text-amber-500" /> Eventos Principais</CardTitle>
+                      <CardDescription className="text-xs">Eventos mais disparados no site</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {events.slice(0, 10).map((e: any, i: number) => {
+                          const barW = Math.max((e.count / maxEventCount) * 100, 6)
+                          return (
+                            <div key={`${e.eventName}-${i}`} className="flex items-center gap-3">
+                              <span className="text-xs font-medium w-[130px] truncate text-muted-foreground font-mono" title={e.eventName}>{e.eventName}</span>
+                              <div className="flex-1">
+                                <div className="h-6 rounded-md bg-amber-400/15 flex items-center px-2 transition-all" style={{ width: `${barW}%` }}>
+                                  <span className="text-[11px] font-bold whitespace-nowrap">{fmtN(e.count)}</span>
+                                </div>
+                              </div>
+                              <span className="text-[11px] text-muted-foreground shrink-0 w-[50px] text-right">{fmtN(e.users)} usr</span>
+                            </div>
+                          )
+                        })}
+                        {events.length === 0 && <p className="text-center text-muted-foreground py-4 text-sm">Sem dados</p>}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Reload button */}
+                <div className="flex justify-center pt-2">
+                  <Button size="sm" variant="outline" onClick={loadGA4} disabled={ga4Loading}>
+                    <RefreshCw className={cn('mr-2 h-3.5 w-3.5', ga4Loading && 'animate-spin')} />
+                    Atualizar dados GA4
+                  </Button>
+                </div>
+              </>
+            )
+          })()}
         </TabsContent>
       </Tabs>
     </div>

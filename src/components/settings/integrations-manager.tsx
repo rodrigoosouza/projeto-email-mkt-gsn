@@ -36,6 +36,12 @@ import type { Integration, IntegrationProvider } from '@/lib/types'
 import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
+interface GA4Status {
+  configured: boolean
+  propertyId: string | null
+  clientEmail: string | null
+}
+
 interface ProviderField {
   key: string
   label: string
@@ -53,6 +59,7 @@ interface ProviderConfig {
   helpUrl: string
   helpLabel: string
   setupSteps: string[]
+  serviceAccount?: boolean
 }
 
 interface ProviderCategory {
@@ -140,18 +147,12 @@ const PROVIDER_CATEGORIES: ProviderCategory[] = [
         helpUrl: 'https://analytics.google.com/analytics/web/#/a/admin',
         helpLabel: 'Abrir Google Analytics',
         setupSteps: [
-          'Acesse analytics.google.com e va em Administrador',
-          'Copie o Property ID (numero de 9 digitos)',
-          'Para API: crie credenciais OAuth no Google Cloud Console',
-          'Habilite a API "Google Analytics Data API"',
-          'Gere Client ID, Client Secret e obtenha um Refresh Token',
+          'Configurado via Service Account (variaveis de ambiente)',
+          'GA4_PROPERTY_ID, GA4_CLIENT_EMAIL e GA4_PRIVATE_KEY no servidor',
+          'Nenhuma configuracao manual necessaria nesta tela',
         ],
-        fields: [
-          { key: 'property_id', label: 'Property ID', placeholder: '123456789', helpText: 'GA4 > Administrador > Propriedade > Detalhes da propriedade' },
-          { key: 'client_id', label: 'Client ID (OAuth)', placeholder: 'xxxxx.apps.googleusercontent.com', helpText: 'Google Cloud Console > APIs > Credenciais > OAuth 2.0' },
-          { key: 'client_secret', label: 'Client Secret', placeholder: 'GOCSPX-xxxxx', type: 'password', helpText: 'Google Cloud Console > APIs > Credenciais > OAuth 2.0' },
-          { key: 'refresh_token', label: 'Refresh Token', placeholder: '1//xxxxx', type: 'password', helpText: 'Gerado apos autorizacao OAuth (use o OAuth Playground do Google)' },
-        ],
+        fields: [],
+        serviceAccount: true,
       },
       {
         provider: 'gtm',
@@ -287,9 +288,15 @@ export function IntegrationsManager() {
   const [syncing, setSyncing] = useState<string | null>(null)
   const [expandedSetup, setExpandedSetup] = useState<string | null>(null)
   const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({})
+  const [ga4Status, setGa4Status] = useState<GA4Status | null>(null)
+  const [ga4TestResult, setGa4TestResult] = useState<{ success: boolean; message: string } | null>(null)
+  const [ga4Testing, setGa4Testing] = useState(false)
 
   useEffect(() => {
-    if (currentOrg) loadIntegrations()
+    if (currentOrg) {
+      loadIntegrations()
+      loadGA4Status()
+    }
   }, [currentOrg])
 
   const loadIntegrations = async () => {
@@ -307,6 +314,45 @@ export function IntegrationsManager() {
       console.error('Erro ao carregar integracoes:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadGA4Status = async () => {
+    try {
+      const res = await fetch('/api/integrations/ga4-status')
+      if (res.ok) {
+        const data = await res.json()
+        setGa4Status(data)
+      }
+    } catch (error) {
+      console.error('Erro ao carregar status GA4:', error)
+    }
+  }
+
+  const testGA4Connection = async () => {
+    setGa4Testing(true)
+    setGa4TestResult(null)
+    try {
+      const res = await fetch('/api/analytics/ga4?type=overview&startDate=7daysAgo&endDate=today')
+      if (res.ok) {
+        const data = await res.json()
+        if (data && !data.error) {
+          setGa4TestResult({ success: true, message: `Conexao OK — ${data.sessions ?? 0} sessoes nos ultimos 7 dias` })
+          toast({ title: 'GA4 conectado', description: 'Dados recebidos com sucesso.' })
+        } else {
+          setGa4TestResult({ success: false, message: data.error || 'Resposta vazia da API' })
+          toast({ title: 'Falha no teste GA4', description: data.error, variant: 'destructive' })
+        }
+      } else {
+        const err = await res.json()
+        setGa4TestResult({ success: false, message: err.error || 'Erro ao conectar' })
+        toast({ title: 'Falha no teste GA4', description: err.error, variant: 'destructive' })
+      }
+    } catch (error: any) {
+      setGa4TestResult({ success: false, message: error.message })
+      toast({ title: 'Erro', description: error.message, variant: 'destructive' })
+    } finally {
+      setGa4Testing(false)
     }
   }
 
@@ -428,16 +474,80 @@ export function IntegrationsManager() {
                           <CardDescription>{providerConfig.description}</CardDescription>
                         </div>
                       </div>
-                      <Badge variant={isConnected ? 'default' : 'secondary'}>
-                        {isConnected ? (
-                          <><Check className="mr-1 h-3 w-3" /> Conectado</>
-                        ) : (
-                          <><X className="mr-1 h-3 w-3" /> Desconectado</>
-                        )}
-                      </Badge>
+                      {/* GA4 Service Account badge */}
+                      {providerConfig.serviceAccount && ga4Status?.configured ? (
+                        <Badge variant="default" className="bg-green-600 hover:bg-green-700">
+                          <Check className="mr-1 h-3 w-3" /> Conectado via Service Account
+                        </Badge>
+                      ) : (
+                        <Badge variant={isConnected ? 'default' : 'secondary'}>
+                          {isConnected ? (
+                            <><Check className="mr-1 h-3 w-3" /> Conectado</>
+                          ) : (
+                            <><X className="mr-1 h-3 w-3" /> Desconectado</>
+                          )}
+                        </Badge>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    {/* Service Account GA4 — special rendering */}
+                    {providerConfig.serviceAccount ? (
+                      <>
+                        {ga4Status?.configured ? (
+                          <div className="space-y-4">
+                            <div className="rounded-lg border bg-green-50 dark:bg-green-950/20 p-4 space-y-3">
+                              <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
+                                <Check className="h-4 w-4" />
+                                <span className="text-sm font-medium">Autenticacao via Service Account configurada no servidor</span>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                  <Label className="text-sm">Property ID</Label>
+                                  <Input value={ga4Status.propertyId || ''} readOnly className="bg-muted" />
+                                </div>
+                                <div className="space-y-1.5">
+                                  <Label className="text-sm">Service Account Email</Label>
+                                  <Input value={ga4Status.clientEmail || ''} readOnly className="bg-muted" />
+                                </div>
+                              </div>
+                            </div>
+
+                            {ga4TestResult && (
+                              <div className={`rounded-lg border p-3 text-sm ${ga4TestResult.success ? 'bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800'}`}>
+                                {ga4TestResult.success ? <Check className="inline h-4 w-4 mr-1" /> : <X className="inline h-4 w-4 mr-1" />}
+                                {ga4TestResult.message}
+                              </div>
+                            )}
+
+                            <div className="flex items-center justify-between pt-4 border-t">
+                              <p className="text-xs text-muted-foreground">
+                                Variaveis de ambiente: GA4_PROPERTY_ID, GA4_CLIENT_EMAIL, GA4_PRIVATE_KEY
+                              </p>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={testGA4Connection}
+                                disabled={ga4Testing}
+                              >
+                                <FlaskConical className={`mr-2 h-4 w-4 ${ga4Testing ? 'animate-pulse' : ''}`} />
+                                {ga4Testing ? 'Testando...' : 'Testar Conexao'}
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="rounded-lg border border-dashed p-4 text-center space-y-2">
+                            <p className="text-sm text-muted-foreground">
+                              GA4 nao configurado. Defina as variaveis de ambiente no servidor:
+                            </p>
+                            <code className="text-xs bg-muted px-2 py-1 rounded">
+                              GA4_PROPERTY_ID, GA4_CLIENT_EMAIL, GA4_PRIVATE_KEY
+                            </code>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <>
                     {/* Setup guide */}
                     <div className="border rounded-lg overflow-hidden">
                       <button
@@ -554,6 +664,8 @@ export function IntegrationsManager() {
                         </Button>
                       </div>
                     </div>
+                      </>
+                    )}
                   </CardContent>
                 </Card>
               )
