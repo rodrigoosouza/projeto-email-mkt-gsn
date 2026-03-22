@@ -44,26 +44,31 @@ export async function GET(req: NextRequest) {
     const decodedEmail = email ? decodeURIComponent(email) : null
     const decodedPhone = phone ? decodeURIComponent(phone) : null
 
-    // Normalize phone: strip all non-digit characters first
+    // Normalize phone: strip all non-digit characters, generate clean variants
+    // IMPORTANT: PostgREST .or() breaks with parentheses/spaces in values
     const phoneVariants: string[] = []
     if (decodedPhone) {
-      phoneVariants.push(decodedPhone)
-      // Strip formatting: (19) 99602-2561 → 19996022561
+      // Strip ALL formatting: (19) 99602-2561 → 19996022561
       const digits = decodedPhone.replace(/\D/g, '')
-      if (digits && digits !== decodedPhone) {
+      if (digits) {
         phoneVariants.push(digits)
+        // Add +55 variant
+        if (!digits.startsWith('55')) {
+          phoneVariants.push(`+55${digits}`)
+          phoneVariants.push(`55${digits}`)
+        }
+        // If starts with 55, add without country code
+        if (digits.startsWith('55') && digits.length > 11) {
+          phoneVariants.push(`+${digits}`)
+          phoneVariants.push(digits.slice(2))
+        }
       }
-      // Add +55 variant
-      if (digits && !digits.startsWith('55')) {
-        phoneVariants.push(`+55${digits}`)
-        phoneVariants.push(`55${digits}`)
-      }
-      // If starts with 55, add without country code
-      if (digits && digits.startsWith('55') && digits.length > 11) {
-        phoneVariants.push(`+${digits}`)
-        phoneVariants.push(digits.slice(2))
+      // Also add original ONLY if it has no special PostgREST chars
+      if (!/[(),]/.test(decodedPhone) && !phoneVariants.includes(decodedPhone)) {
+        phoneVariants.push(decodedPhone)
       }
     }
+    console.log(`[Tracking API] Phone variants:`, phoneVariants)
 
     const tracking = createTrackingClient()
 
