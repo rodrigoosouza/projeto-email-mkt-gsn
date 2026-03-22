@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getOrgContext } from '@/lib/supabase/org-context'
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || ''
@@ -17,13 +18,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'orgId e month sao obrigatorios' }, { status: 400 })
     }
 
+    if (!OPENROUTER_API_KEY) {
+      return NextResponse.json({ error: 'OPENROUTER_API_KEY nao configurada' }, { status: 500 })
+    }
+
     // Load org context
     const orgContext = await getOrgContext(orgId)
     if (!orgContext) {
       return NextResponse.json({ error: 'Organizacao nao encontrada' }, { status: 404 })
     }
 
+    if (!orgContext.summary || orgContext.summary.trim().length < 20) {
+      return NextResponse.json({ error: 'Complete o briefing e gere a estrategia primeiro para criar o calendario.' }, { status: 400 })
+    }
+
     const prompt = buildCalendarPrompt(orgContext.summary, month, platform || 'instagram')
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 120000) // 2 min timeout
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -31,9 +43,10 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
       },
+      signal: controller.signal,
       body: JSON.stringify({
         model: 'anthropic/claude-sonnet-4',
-        max_tokens: 8000,
+        max_tokens: 12000,
         messages: [
           {
             role: 'system',
@@ -44,13 +57,20 @@ export async function POST(req: NextRequest) {
       }),
     })
 
+    clearTimeout(timeout)
+
     if (!response.ok) {
       const errBody = await response.text().catch(() => '')
-      throw new Error(`OpenRouter error: ${response.status} - ${errBody.substring(0, 200)}`)
+      console.error('[Content Calendar] OpenRouter error:', response.status, errBody.substring(0, 500))
+      throw new Error(`Erro na IA (${response.status}). Tente novamente.`)
     }
 
     const data = await response.json()
-    const content = data.choices[0].message.content || ''
+    const content = data.choices?.[0]?.message?.content || ''
+
+    if (!content) {
+      return NextResponse.json({ error: 'IA retornou resposta vazia. Tente novamente.' }, { status: 500 })
+    }
 
     // Parse JSON from response
     let posts
@@ -58,15 +78,58 @@ export async function POST(req: NextRequest) {
       const jsonMatch = content.match(/\[[\s\S]*\]/)
       posts = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(content)
     } catch {
-      return NextResponse.json({ error: 'Erro ao parsear resposta da IA', raw: content }, { status: 500 })
+      console.error('[Content Calendar] Parse error. Raw:', content.substring(0, 500))
+      return NextResponse.json({ error: 'Erro ao parsear resposta da IA. Tente novamente.', raw: content.substring(0, 200) }, { status: 500 })
     }
 
-    return NextResponse.json({ posts, model: data.model })
+    if (!Array.isArray(posts) || posts.length === 0) {
+      return NextResponse.json({ error: 'IA nao gerou posts. Tente novamente.' }, { status: 500 })
+    }
+
+    // Save directly to DB using admin client (bypass RLS)
+    const admin = createAdminClient()
+    const rows = posts.map((p: any) => ({
+      org_id: orgId,
+      title: p.title || 'Post',
+      pillar: validatePillar(p.pillar),
+      content_type: p.content_type || 'tip',
+      format: validateFormat(p.format),
+      platform: p.platform || platform || 'instagram',
+      caption: p.caption || null,
+      hashtags: Array.isArray(p.hashtags) ? p.hashtags : [],
+      image_prompt: p.image_prompt || null,
+      scheduled_for: p.scheduled_for || null,
+      status: 'generated',
+      ai_generated: true,
+      created_by: user.id,
+    }))
+
+    const { data: saved, error: saveError } = await admin
+      .from('content_calendar')
+      .insert(rows)
+      .select()
+
+    if (saveError) {
+      console.error('[Content Calendar] Save error:', saveError)
+      throw new Error(`Erro ao salvar posts: ${saveError.message}`)
+    }
+
+    return NextResponse.json({ posts: saved, count: saved?.length || 0, model: data.model })
   } catch (error: unknown) {
     const errMsg = error instanceof Error ? error.message : String(error)
     console.error('[Content Calendar] Error:', errMsg)
     return NextResponse.json({ error: errMsg }, { status: 500 })
   }
+}
+
+function validatePillar(p: string): string {
+  const valid = ['growth', 'connection', 'objection_breaking', 'authority']
+  return valid.includes(p) ? p : 'growth'
+}
+
+function validateFormat(f: string): string {
+  const valid = ['reels', 'carousel', 'static_post', 'stories', 'article']
+  return valid.includes(f) ? f : 'static_post'
 }
 
 function buildCalendarPrompt(orgSummary: string, month: string, platform: string): string {

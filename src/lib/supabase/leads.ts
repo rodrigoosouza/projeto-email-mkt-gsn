@@ -46,7 +46,7 @@ export async function queryLeads(
 
   let query = supabase
     .from('leads')
-    .select('*, lead_tag_assignments(tag:lead_tags(*))', { count: 'exact' })
+    .select('*, lead_tag_assignments(tag:tag_definitions(*))', { count: 'exact' })
     .eq('org_id', orgId)
 
   if (filters.search) {
@@ -108,7 +108,7 @@ export async function createLead(orgId: string, payload: CreateLeadPayload): Pro
   // Handle tags
   if (payload.tags?.length) {
     const { data: existingTags } = await supabase
-      .from('lead_tags')
+      .from('tag_definitions')
       .select()
       .eq('org_id', orgId)
       .in('name', payload.tags)
@@ -194,7 +194,7 @@ export async function bulkCreateLeads(
 export async function getLeadTags(orgId: string): Promise<LeadTag[]> {
   const supabase = createClient()
   const { data, error } = await supabase
-    .from('lead_tags')
+    .from('tag_definitions')
     .select()
     .eq('org_id', orgId)
     .order('name')
@@ -205,7 +205,7 @@ export async function getLeadTags(orgId: string): Promise<LeadTag[]> {
 export async function createLeadTag(orgId: string, name: string, color: string): Promise<LeadTag> {
   const supabase = createClient()
   const { data, error } = await supabase
-    .from('lead_tags')
+    .from('tag_definitions')
     .insert({ org_id: orgId, name, color })
     .select()
     .single()
@@ -223,7 +223,7 @@ export async function addTagToLead(leadId: string, tagId: string): Promise<void>
   try {
     const [{ data: lead }, { data: tag }] = await Promise.all([
       supabase.from('leads').select('org_id').eq('id', leadId).single(),
-      supabase.from('lead_tags').select('name').eq('id', tagId).single(),
+      supabase.from('tag_definitions').select('name').eq('id', tagId).single(),
     ])
     if (lead && tag) {
       await logLeadEvent(supabase, lead.org_id, leadId, 'tag_added', `Tag adicionada: ${tag.name}`, undefined, { tag_id: tagId, tag_name: tag.name })
@@ -242,7 +242,7 @@ export async function removeTagFromLead(leadId: string, tagId: string): Promise<
   try {
     const [{ data: lead }, { data: tag }] = await Promise.all([
       supabase.from('leads').select('org_id').eq('id', leadId).single(),
-      supabase.from('lead_tags').select('name').eq('id', tagId).single(),
+      supabase.from('tag_definitions').select('name').eq('id', tagId).single(),
     ])
     orgId = lead?.org_id || null
     tagName = tag?.name || null

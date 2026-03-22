@@ -116,30 +116,23 @@ export default function ContentCalendarPage() {
         }),
       })
 
+      const result = await res.json()
+
       if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || 'Erro na geracao')
+        throw new Error(result.error || 'Erro na geracao')
       }
 
-      const { posts: generatedPosts } = await res.json()
-
-      if (generatedPosts && generatedPosts.length > 0) {
-        try {
-          await bulkCreateContentPosts(currentOrg.id, generatedPosts)
-          toast({ title: `${generatedPosts.length} posts gerados com sucesso!` })
-          fetchPosts()
-        } catch (saveError: unknown) {
-          const saveMsg = saveError instanceof Error ? saveError.message : 'Erro ao salvar posts'
-          console.error('[Calendar] Erro ao salvar posts:', saveError)
-          toast({ title: 'Erro ao salvar posts', description: saveMsg, variant: 'destructive' })
-        }
+      const count = result.count || result.posts?.length || 0
+      if (count > 0) {
+        toast({ title: `${count} posts gerados com sucesso!` })
+        fetchPosts()
       } else {
         toast({ title: 'Nenhum post gerado', description: 'A IA nao retornou posts. Tente novamente.', variant: 'destructive' })
       }
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : 'Erro ao gerar calendario'
       console.error('[Calendar] Erro na geracao:', error)
-      toast({ title: msg, variant: 'destructive' })
+      toast({ title: 'Erro', description: msg, variant: 'destructive' })
     } finally {
       setGenerating(false)
     }

@@ -47,8 +47,11 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith(path)
   )
   const isApiWebhook = request.nextUrl.pathname.startsWith('/api/webhooks')
+  const isApiPublic = ['/api/forms/', '/api/tracking/', '/api/bio/', '/api/chatbot/', '/api/meta-ads/sync', '/api/pipedrive/sync'].some(
+    (path) => request.nextUrl.pathname.startsWith(path)
+  )
 
-  if (!user && !isPublicPath && !isApiWebhook) {
+  if (!user && !isPublicPath && !isApiWebhook && !isApiPublic) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)

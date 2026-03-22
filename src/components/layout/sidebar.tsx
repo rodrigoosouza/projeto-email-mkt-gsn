@@ -33,6 +33,8 @@ import {
   CalendarDays,
   MousePointerClick,
   Megaphone,
+  Handshake,
+  TrendingUp,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -105,7 +107,11 @@ const navigationGroups: NavGroup[] = [
   {
     label: 'Trafego Pago',
     items: [
-      { name: 'Campanhas Ads', href: '/ads', icon: Megaphone },
+      { name: 'Dashboard Meta Ads', href: '/ads/dashboard', icon: BarChart3 },
+      { name: 'CRM Funil', href: '/pipedrive', icon: Handshake },
+      { name: 'Analise MKT e Vendas', href: '/growth', icon: TrendingUp },
+      { name: 'IA Growth Copilot', href: '/growth/chat', icon: Zap },
+      { name: 'Criar Campanha ADS', href: '/ads', icon: Megaphone },
       { name: 'Publicos', href: '/audience-exports', icon: Share2 },
     ],
   },

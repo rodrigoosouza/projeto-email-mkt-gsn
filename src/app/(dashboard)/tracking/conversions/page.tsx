@@ -25,7 +25,7 @@ import {
   useTrackingConversions,
   useTrackingFunnel,
 } from '@/hooks/tracking'
-import { getAllOrgTables } from '@/lib/tracking/organizations'
+import { getTrackingOrgByOrgId } from '@/lib/tracking/organizations'
 import type { OrgTables } from '@/lib/tracking/organizations'
 // DateRange from types includes 'custom', but we only use 7d/30d/90d here
 import {
@@ -42,6 +42,7 @@ import {
   CHANNEL_COLORS,
   CHART_COLORS,
 } from '@/lib/tracking/constants'
+import { useOrganizationContext } from '@/contexts/organization-context'
 
 type DateRangeOption = '7d' | '30d' | '90d'
 
@@ -59,13 +60,22 @@ const STATUS_OPTIONS = [
 ]
 
 export default function TrackingConversionsPage() {
+  const { currentOrg } = useOrganizationContext()
   const [dateRange, setDateRange] = useState<DateRangeOption>('30d')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
 
-  const { startDate, endDate } = useMemo(() => getDateRange(dateRange), [dateRange])
+  const trackingOrg = useMemo(() => {
+    if (!currentOrg) return null
+    return getTrackingOrgByOrgId(currentOrg.id) || null
+  }, [currentOrg?.id])
 
-  const orgTablesList: OrgTables[] = useMemo(() => getAllOrgTables(), [])
+  const orgTablesList: OrgTables[] = useMemo(() => {
+    if (trackingOrg) return [trackingOrg.tables]
+    return []
+  }, [trackingOrg])
+
+  const { startDate, endDate } = useMemo(() => getDateRange(dateRange), [dateRange])
 
   const { data, loading, total, page, pageSize, setPage } = useTrackingConversions(
     {

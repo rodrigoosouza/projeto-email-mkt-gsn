@@ -70,7 +70,10 @@ export function TemplateForm({ template }: TemplateFormProps) {
   const { currentOrg } = useOrganizationContext()
   const { user } = useAuth()
   const [step, setStep] = useState<'info' | 'builder'>(template ? 'builder' : 'info')
-  const [editorMode, setEditorMode] = useState<'visual' | 'html'>('visual')
+  // If template has html_content but no unlayer_json (AI-generated), default to HTML mode
+  const [editorMode, setEditorMode] = useState<'visual' | 'html'>(
+    template && template.html_content && !template.unlayer_json ? 'html' : 'visual'
+  )
   const [activeTab, setActiveTab] = useState<'code' | 'preview'>('code')
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop')
   const [unlayerJson, setUnlayerJson] = useState<any>(template?.unlayer_json || null)

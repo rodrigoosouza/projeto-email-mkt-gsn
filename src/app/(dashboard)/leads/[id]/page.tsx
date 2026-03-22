@@ -172,7 +172,7 @@ export default function LeadDetailPage() {
           {currentOrg && (
             <LeadTimeline leadId={lead.id} orgId={currentOrg.id} />
           )}
-          <LeadTrackingJourney email={lead.email} phone={lead.phone} orgSlug={currentOrg?.slug} />
+          <LeadTrackingJourney email={lead.email} phone={lead.phone} orgSlug={currentOrg?.slug} orgId={currentOrg?.id} />
         </div>
         <div>
           <LeadTagsManager

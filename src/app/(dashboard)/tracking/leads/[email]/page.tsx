@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useTrackingJourney } from '@/hooks/tracking'
-import { getAllOrgTables } from '@/lib/tracking/organizations'
+import { getTrackingOrgByOrgId } from '@/lib/tracking/organizations'
+import type { OrgTables } from '@/lib/tracking/organizations'
 import {
   formatDate,
   formatDateTime,
@@ -20,13 +21,24 @@ import {
   TEMPERATURE_LABELS,
   CHANNEL_COLORS,
 } from '@/lib/tracking/constants'
+import { useOrganizationContext } from '@/contexts/organization-context'
 
 export default function TrackingLeadDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const { currentOrg } = useOrganizationContext()
   const email = params.email as string
 
-  const orgTablesList = useMemo(() => getAllOrgTables(), [])
+  const trackingOrg = useMemo(() => {
+    if (!currentOrg) return null
+    return getTrackingOrgByOrgId(currentOrg.id) || null
+  }, [currentOrg?.id])
+
+  const orgTablesList: OrgTables[] = useMemo(() => {
+    if (trackingOrg) return [trackingOrg.tables]
+    return []
+  }, [trackingOrg])
+
   const { lead, events, loading, error } = useTrackingJourney(email, orgTablesList, undefined)
 
   // Group events by session

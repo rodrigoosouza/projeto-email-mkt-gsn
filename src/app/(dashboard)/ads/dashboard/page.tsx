@@ -470,18 +470,9 @@ export default function AdsDashboardPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {lastSync && (
-            <span className="text-xs text-muted-foreground">
-              Sync: {lastSync}
-            </span>
-          )}
-          <Button variant="default" size="sm" onClick={handleSync} disabled={syncing}>
-            <RefreshCw className={cn('mr-2 h-4 w-4', syncing && 'animate-spin')} />
-            {syncing ? 'Sincronizando...' : 'Sincronizar Meta Ads'}
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
-            <RefreshCw className={cn('mr-2 h-4 w-4', refreshing && 'animate-spin')} />
-            Atualizar
+          <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing}>
+            <RefreshCw className={cn('mr-2 h-3.5 w-3.5', syncing && 'animate-spin')} />
+            {syncing ? 'Sincronizando...' : 'Sincronizar'}
           </Button>
         </div>
       </div>
@@ -513,7 +504,7 @@ export default function AdsDashboardPage() {
       </div>
 
       {/* KPIs */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-5">
         <KpiCard
           title="Investimento"
           value={formatCurrency(kpis.totalSpend)}
@@ -530,6 +521,14 @@ export default function AdsDashboardPage() {
           change={calcChange(kpis.totalLeads, prevKpis.totalLeads)}
           icon={Users}
           iconColor="bg-emerald-500"
+        />
+        <KpiCard
+          title="Taxa de Conversao"
+          value={kpis.totalClicks > 0 ? formatPercent((kpis.totalLeads / kpis.totalClicks) * 100) : '0%'}
+          subtitle="Leads / Cliques"
+          change={null}
+          icon={TrendingUp}
+          iconColor="bg-teal-500"
         />
         <KpiCard
           title="Impressões"
@@ -668,6 +667,9 @@ export default function AdsDashboardPage() {
                       </button>
                     </TableHead>
                     <TableHead className="text-right w-[80px]">
+                      <span className="text-xs">Conv.</span>
+                    </TableHead>
+                    <TableHead className="text-right w-[80px]">
                       <button onClick={() => handleSort('leads')} className="flex items-center gap-1 ml-auto hover:text-foreground">
                         Leads <SortIcon column="leads" />
                       </button>
@@ -684,7 +686,7 @@ export default function AdsDashboardPage() {
                     <TableRow key={c.campaign_name} className="group">
                       <TableCell>
                         <div className="space-y-1.5">
-                          <span className="font-medium text-sm block truncate max-w-[300px]" title={c.campaign_name}>
+                          <span className="font-medium text-sm block break-words" title={c.campaign_name}>
                             {c.campaign_name}
                           </span>
                           {/* Spend progress bar */}
@@ -714,6 +716,20 @@ export default function AdsDashboardPage() {
                         )}>
                           {formatPercent(c.ctr)}
                         </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {c.clicks > 0 && c.leads > 0 ? (
+                          <span className={cn(
+                            'text-xs font-medium px-1.5 py-0.5 rounded',
+                            (c.leads / c.clicks) * 100 >= 5 ? 'bg-emerald-500/10 text-emerald-600' :
+                            (c.leads / c.clicks) * 100 >= 2 ? 'bg-amber-500/10 text-amber-600' :
+                            'bg-red-500/10 text-red-600'
+                          )}>
+                            {formatPercent((c.leads / c.clicks) * 100)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         {c.leads > 0 ? (
@@ -751,6 +767,11 @@ export default function AdsDashboardPage() {
                     <TableCell className="text-right">
                       <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-muted">
                         {formatPercent(kpis.avgCTR)}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-muted">
+                        {kpis.totalClicks > 0 ? formatPercent((kpis.totalLeads / kpis.totalClicks) * 100) : '—'}
                       </span>
                     </TableCell>
                     <TableCell className="text-right text-emerald-600 dark:text-emerald-400">

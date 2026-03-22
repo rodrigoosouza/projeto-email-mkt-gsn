@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Download, Search, Loader2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -23,11 +23,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useTrackingLeads } from '@/hooks/tracking'
-import {
-  TRACKING_ORGANIZATIONS,
-  getAllOrgTables,
-  getTrackingOrgById,
-} from '@/lib/tracking/organizations'
+import { getTrackingOrgByOrgId } from '@/lib/tracking/organizations'
 import type { OrgTables } from '@/lib/tracking/organizations'
 // DateRange from types includes 'custom', but we only use 7d/30d/90d here
 import {
@@ -46,14 +42,6 @@ import {
 import { useOrganizationContext } from '@/contexts/organization-context'
 
 type DateRangeOption = '7d' | '30d' | '90d'
-
-function orgNameToTrackingId(name: string): string {
-  const lower = name.toLowerCase()
-  if (lower.includes('templum')) return 'templum'
-  if (lower.includes('orbit')) return 'orbit'
-  if (lower.includes('evolutto')) return 'evolutto'
-  return 'all'
-}
 
 const DATE_RANGE_OPTIONS: { label: string; value: DateRangeOption }[] = [
   { label: '7 dias', value: '7d' },
@@ -80,23 +68,22 @@ export default function TrackingLeadsPage() {
   const router = useRouter()
   const { currentOrg } = useOrganizationContext()
   const [dateRange, setDateRange] = useState<DateRangeOption>('30d')
-  const [selectedOrg, setSelectedOrg] = useState('all')
-
-  useEffect(() => {
-    if (currentOrg) setSelectedOrg(orgNameToTrackingId(currentOrg.name))
-  }, [currentOrg?.id])
   const [search, setSearch] = useState('')
   const [temperature, setTemperature] = useState('')
   const [status, setStatus] = useState('')
   const [channel, setChannel] = useState('')
 
-  const { startDate, endDate } = useMemo(() => getDateRange(dateRange), [dateRange])
+  const trackingOrg = useMemo(() => {
+    if (!currentOrg) return null
+    return getTrackingOrgByOrgId(currentOrg.id) || null
+  }, [currentOrg?.id])
 
   const orgTablesList: OrgTables[] = useMemo(() => {
-    if (selectedOrg === 'all') return getAllOrgTables()
-    const org = getTrackingOrgById(selectedOrg)
-    return org ? [org.tables] : getAllOrgTables()
-  }, [selectedOrg])
+    if (trackingOrg) return [trackingOrg.tables]
+    return []
+  }, [trackingOrg])
+
+  const { startDate, endDate } = useMemo(() => getDateRange(dateRange), [dateRange])
 
   const { data, loading, total, page, pageSize, setPage } = useTrackingLeads(
     {

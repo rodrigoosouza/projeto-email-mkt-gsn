@@ -67,27 +67,14 @@ function TableSkeleton() {
     <>
       {Array.from({ length: 5 }).map((_, i) => (
         <TableRow key={i}>
-          <TableCell>
-            <Skeleton className="h-4 w-4" />
-          </TableCell>
-          <TableCell>
-            <Skeleton className="h-4 w-32" />
-          </TableCell>
-          <TableCell>
-            <Skeleton className="h-4 w-40" />
-          </TableCell>
-          <TableCell>
-            <Skeleton className="h-5 w-16 rounded-full" />
-          </TableCell>
-          <TableCell>
-            <Skeleton className="h-2 w-16" />
-          </TableCell>
-          <TableCell>
-            <Skeleton className="h-5 w-20 rounded-full" />
-          </TableCell>
-          <TableCell>
-            <Skeleton className="h-4 w-24" />
-          </TableCell>
+          <TableCell><Skeleton className="h-4 w-4" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-36" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+          <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+          <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
         </TableRow>
       ))}
     </>
@@ -248,9 +235,10 @@ export function LeadsTable({
               </TableHead>
               <TableHead>Nome</TableHead>
               <TableHead>Email</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Score</TableHead>
-              <TableHead>Tags</TableHead>
+              <TableHead>Empresa</TableHead>
+              <TableHead>Fonte</TableHead>
+              <TableHead>Criativo</TableHead>
+              <TableHead>Etapa CRM</TableHead>
               <TableHead>Criado em</TableHead>
             </TableRow>
           </TableHeader>
@@ -281,35 +269,34 @@ export function LeadsTable({
                     <TableCell className="font-medium">
                       {fullName || <span className="text-muted-foreground">-</span>}
                     </TableCell>
-                    <TableCell>{lead.email}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className={statusColor}>
-                        {statusLabel}
-                      </Badge>
+                    <TableCell className="text-sm max-w-[180px] truncate">{lead.email}</TableCell>
+                    <TableCell className="text-sm">
+                      {lead.company || <span className="text-muted-foreground">-</span>}
                     </TableCell>
                     <TableCell>
-                      <ScoreBar score={lead.score} />
+                      {lead.source ? (
+                        <Badge variant="outline" className="text-xs">
+                          {lead.source}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-xs max-w-[150px] truncate text-muted-foreground">
+                      {(lead.custom_fields as any)?.criativo || '-'}
                     </TableCell>
                     <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {tags.length > 0 ? (
-                          tags.map((tag) => (
-                            <Badge
-                              key={tag.id}
-                              variant="outline"
-                              style={{
-                                borderColor: tag.color,
-                                color: tag.color,
-                                backgroundColor: `${tag.color}15`,
-                              }}
-                            >
-                              {tag.name}
-                            </Badge>
-                          ))
-                        ) : (
-                          <span className="text-xs text-muted-foreground">-</span>
-                        )}
-                      </div>
+                      {(lead.custom_fields as any)?.deal_stage ? (
+                        <Badge variant="secondary" className="text-xs">
+                          {(lead.custom_fields as any).deal_stage}
+                        </Badge>
+                      ) : (lead.custom_fields as any)?.deal_status ? (
+                        <Badge variant="secondary" className="text-xs">
+                          {(lead.custom_fields as any).deal_status}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {formatDistanceToNow(new Date(lead.created_at), {
