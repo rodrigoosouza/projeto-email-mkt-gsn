@@ -1,109 +1,220 @@
-// GA4 Data API client
-// Uses Google Analytics Data API v1beta
-// Requires: property_id and credentials in integration config
+// Google Analytics 4 Data API client
+// Uses service account authentication via google-auth-library
+
+import { GoogleAuth } from 'google-auth-library'
 
 const GA4_API_BASE = 'https://analyticsdata.googleapis.com/v1beta'
 
-interface GA4Config {
-  property_id: string
-  access_token?: string
-  refresh_token?: string
-  client_id?: string
-  client_secret?: string
-}
+let authClient: GoogleAuth | null = null
 
-interface GA4ReportRequest {
-  dateRanges: { startDate: string; endDate: string }[]
-  metrics: { name: string }[]
-  dimensions?: { name: string }[]
-  limit?: number
-}
+function getAuth(): GoogleAuth {
+  if (authClient) return authClient
 
-export async function refreshAccessToken(config: GA4Config): Promise<string | null> {
-  if (!config.refresh_token || !config.client_id || !config.client_secret) {
-    return config.access_token || null
+  const clientEmail = process.env.GA4_CLIENT_EMAIL
+  const privateKey = process.env.GA4_PRIVATE_KEY?.replace(/\\n/g, '\n')
+
+  if (!clientEmail || !privateKey) {
+    throw new Error('GA4_CLIENT_EMAIL and GA4_PRIVATE_KEY must be set')
   }
 
-  try {
-    const response = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: config.client_id,
-        client_secret: config.client_secret,
-        refresh_token: config.refresh_token,
-        grant_type: 'refresh_token',
-      }),
-    })
+  authClient = new GoogleAuth({
+    credentials: {
+      client_email: clientEmail,
+      private_key: privateKey,
+    },
+    scopes: ['https://www.googleapis.com/auth/analytics.readonly'],
+  })
 
-    if (!response.ok) return null
-    const data = await response.json()
-    return data.access_token
-  } catch {
-    return null
-  }
+  return authClient
 }
 
-export async function runGA4Report(config: GA4Config, request: GA4ReportRequest) {
-  const token = await refreshAccessToken(config)
-  if (!token) throw new Error('No valid access token for GA4')
+async function fetchGA4(propertyId: string, body: Record<string, any>): Promise<any> {
+  const auth = getAuth()
+  const client = await auth.getClient()
+  const token = await client.getAccessToken()
 
   const response = await fetch(
-    `${GA4_API_BASE}/properties/${config.property_id}:runReport`,
+    `${GA4_API_BASE}/properties/${propertyId}:runReport`,
     {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${token}`,
+        'Authorization': `Bearer ${token.token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(request),
+      body: JSON.stringify(body),
     }
   )
 
   if (!response.ok) {
     const error = await response.text()
-    throw new Error(`GA4 API error: ${response.status} - ${error}`)
+    throw new Error(`GA4 API Error: ${response.status} - ${error}`)
   }
 
   return response.json()
 }
 
-// Pre-built report functions
-export async function getPageViews(config: GA4Config, startDate: string, endDate: string) {
-  return runGA4Report(config, {
-    dateRanges: [{ startDate, endDate }],
-    metrics: [{ name: 'screenPageViews' }],
-    dimensions: [{ name: 'date' }],
+// Parse GA4 response rows into clean objects
+function parseRows(response: any, dimensionNames: string[], metricNames: string[]): Record<string, any>[] {
+  if (!response.rows) return []
+
+  return response.rows.map((row: any) => {
+    const obj: Record<string, any> = {}
+    row.dimensionValues?.forEach((dim: any, i: number) => {
+      obj[dimensionNames[i]] = dim.value
+    })
+    row.metricValues?.forEach((met: any, i: number) => {
+      obj[metricNames[i]] = Number(met.value)
+    })
+    return obj
   })
 }
 
-export async function getTopPages(config: GA4Config, startDate: string, endDate: string, limit = 10) {
-  return runGA4Report(config, {
-    dateRanges: [{ startDate, endDate }],
-    metrics: [{ name: 'screenPageViews' }, { name: 'averageSessionDuration' }],
-    dimensions: [{ name: 'pagePath' }],
-    limit,
-  })
-}
-
-export async function getTrafficSources(config: GA4Config, startDate: string, endDate: string) {
-  return runGA4Report(config, {
-    dateRanges: [{ startDate, endDate }],
-    metrics: [{ name: 'sessions' }, { name: 'totalUsers' }],
-    dimensions: [{ name: 'sessionSource' }, { name: 'sessionMedium' }],
-    limit: 20,
-  })
-}
-
-export async function getOverview(config: GA4Config, startDate: string, endDate: string) {
-  return runGA4Report(config, {
+// Get overview metrics
+export async function getOverview(propertyId: string, startDate: string, endDate: string) {
+  const response = await fetchGA4(propertyId, {
     dateRanges: [{ startDate, endDate }],
     metrics: [
-      { name: 'screenPageViews' },
       { name: 'sessions' },
       { name: 'totalUsers' },
-      { name: 'bounceRate' },
+      { name: 'newUsers' },
+      { name: 'screenPageViews' },
       { name: 'averageSessionDuration' },
+      { name: 'bounceRate' },
+      { name: 'conversions' },
+      { name: 'engagedSessions' },
     ],
   })
+
+  const row = response.rows?.[0]
+  if (!row) return null
+
+  const metrics = row.metricValues || []
+  return {
+    sessions: Number(metrics[0]?.value || 0),
+    totalUsers: Number(metrics[1]?.value || 0),
+    newUsers: Number(metrics[2]?.value || 0),
+    pageViews: Number(metrics[3]?.value || 0),
+    avgSessionDuration: Number(metrics[4]?.value || 0),
+    bounceRate: Number(metrics[5]?.value || 0),
+    conversions: Number(metrics[6]?.value || 0),
+    engagedSessions: Number(metrics[7]?.value || 0),
+  }
+}
+
+// Get traffic sources
+export async function getTrafficSources(propertyId: string, startDate: string, endDate: string) {
+  const response = await fetchGA4(propertyId, {
+    dateRanges: [{ startDate, endDate }],
+    dimensions: [{ name: 'sessionSource' }, { name: 'sessionMedium' }],
+    metrics: [
+      { name: 'sessions' },
+      { name: 'totalUsers' },
+      { name: 'conversions' },
+      { name: 'bounceRate' },
+    ],
+    orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
+    limit: 20,
+  })
+
+  return parseRows(response, ['source', 'medium'], ['sessions', 'users', 'conversions', 'bounceRate'])
+}
+
+// Get top pages
+export async function getTopPages(propertyId: string, startDate: string, endDate: string) {
+  const response = await fetchGA4(propertyId, {
+    dateRanges: [{ startDate, endDate }],
+    dimensions: [{ name: 'pagePath' }],
+    metrics: [
+      { name: 'screenPageViews' },
+      { name: 'totalUsers' },
+      { name: 'averageSessionDuration' },
+      { name: 'bounceRate' },
+      { name: 'conversions' },
+    ],
+    orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }],
+    limit: 20,
+  })
+
+  return parseRows(response, ['pagePath'], ['pageViews', 'users', 'avgDuration', 'bounceRate', 'conversions'])
+}
+
+// Get daily trend
+export async function getDailyTrend(propertyId: string, startDate: string, endDate: string) {
+  const response = await fetchGA4(propertyId, {
+    dateRanges: [{ startDate, endDate }],
+    dimensions: [{ name: 'date' }],
+    metrics: [
+      { name: 'sessions' },
+      { name: 'totalUsers' },
+      { name: 'screenPageViews' },
+      { name: 'conversions' },
+    ],
+    orderBys: [{ dimension: { dimensionName: 'date' }, desc: false }],
+  })
+
+  return parseRows(response, ['date'], ['sessions', 'users', 'pageViews', 'conversions'])
+}
+
+// Get geography
+export async function getGeography(propertyId: string, startDate: string, endDate: string) {
+  const response = await fetchGA4(propertyId, {
+    dateRanges: [{ startDate, endDate }],
+    dimensions: [{ name: 'region' }],
+    metrics: [
+      { name: 'sessions' },
+      { name: 'totalUsers' },
+      { name: 'conversions' },
+    ],
+    orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
+    limit: 15,
+  })
+
+  return parseRows(response, ['region'], ['sessions', 'users', 'conversions'])
+}
+
+// Get devices
+export async function getDevices(propertyId: string, startDate: string, endDate: string) {
+  const response = await fetchGA4(propertyId, {
+    dateRanges: [{ startDate, endDate }],
+    dimensions: [{ name: 'deviceCategory' }],
+    metrics: [
+      { name: 'sessions' },
+      { name: 'totalUsers' },
+      { name: 'conversions' },
+    ],
+    orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
+  })
+
+  return parseRows(response, ['device'], ['sessions', 'users', 'conversions'])
+}
+
+// Get top events
+export async function getTopEvents(propertyId: string, startDate: string, endDate: string) {
+  const response = await fetchGA4(propertyId, {
+    dateRanges: [{ startDate, endDate }],
+    dimensions: [{ name: 'eventName' }],
+    metrics: [
+      { name: 'eventCount' },
+      { name: 'totalUsers' },
+    ],
+    orderBys: [{ metric: { metricName: 'eventCount' }, desc: true }],
+    limit: 20,
+  })
+
+  return parseRows(response, ['eventName'], ['count', 'users'])
+}
+
+// Full report
+export async function getFullReport(propertyId: string, startDate: string, endDate: string) {
+  const [overview, sources, pages, daily, geography, devices, events] = await Promise.all([
+    getOverview(propertyId, startDate, endDate),
+    getTrafficSources(propertyId, startDate, endDate),
+    getTopPages(propertyId, startDate, endDate),
+    getDailyTrend(propertyId, startDate, endDate),
+    getGeography(propertyId, startDate, endDate),
+    getDevices(propertyId, startDate, endDate),
+    getTopEvents(propertyId, startDate, endDate),
+  ])
+
+  return { overview, sources, pages, daily, geography, devices, events }
 }
