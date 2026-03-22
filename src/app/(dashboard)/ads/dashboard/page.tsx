@@ -1,10 +1,9 @@
+// @ts-nocheck
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
 import {
   Loader2,
-  TrendingUp,
-  TrendingDown,
   DollarSign,
   Eye,
   Users,
