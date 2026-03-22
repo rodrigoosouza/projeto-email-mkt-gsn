@@ -97,28 +97,58 @@ export async function GET(req: NextRequest) {
     )
     const lead = leadResults.flat()[0] || null
 
-    // Query events tables across all org tables (by email or phone)
-    const eventResults = await Promise.all(
+    // Step 1: Find client_ids associated with this email/phone
+    // Most events (page_view, scroll, etc) do NOT have email — only generate_lead does
+    // So we first find the client_id from events that DO have the email,
+    // then fetch ALL events for those client_ids
+    const clientIdResults = await Promise.all(
       orgTablesList.map(async (tables) => {
-        // Build OR filter for email + phone variants
         const orFilters: string[] = []
-        if (decodedEmail) {
-          orFilters.push(`email.eq.${decodedEmail}`)
-        }
-        for (const pv of phoneVariants) {
-          orFilters.push(`phone.eq.${pv}`)
-        }
-
+        if (decodedEmail) orFilters.push(`email.eq.${decodedEmail}`)
+        for (const pv of phoneVariants) orFilters.push(`phone.eq.${pv}`)
         if (orFilters.length === 0) return []
 
         const { data, error } = await tracking
           .from(tables.events)
-          .select('*')
+          .select('client_id')
           .or(orFilters.join(','))
-          .order('created_at', { ascending: true })
-          .limit(500)
+          .not('client_id', 'is', null)
+          .limit(50)
         if (error) {
-          console.error(`[Tracking API] Error querying ${tables.events}:`, error.message)
+          console.error(`[Tracking API] Error finding client_ids in ${tables.events}:`, error.message)
+        }
+        return { tables, clientIds: Array.from(new Set((data || []).map((r: any) => r.client_id).filter(Boolean))) }
+      })
+    )
+
+    // Step 2: Fetch ALL events for found client_ids (this gets the full journey)
+    const eventResults = await Promise.all(
+      clientIdResults.map(async (result: any) => {
+        if (!result || !result.clientIds || result.clientIds.length === 0) {
+          // Fallback: still try email/phone direct match
+          const orFilters: string[] = []
+          if (decodedEmail) orFilters.push(`email.eq.${decodedEmail}`)
+          for (const pv of phoneVariants) orFilters.push(`phone.eq.${pv}`)
+          if (orFilters.length === 0) return []
+
+          const { data } = await tracking
+            .from(result.tables.events)
+            .select('*')
+            .or(orFilters.join(','))
+            .order('created_at', { ascending: true })
+            .limit(500)
+          return data || []
+        }
+
+        // Query by client_id — this gets ALL page_views, scrolls, etc
+        const { data, error } = await tracking
+          .from(result.tables.events)
+          .select('*')
+          .in('client_id', result.clientIds)
+          .order('created_at', { ascending: true })
+          .limit(1000)
+        if (error) {
+          console.error(`[Tracking API] Error querying ${result.tables.events} by client_id:`, error.message)
         }
         return data || []
       })
@@ -127,7 +157,8 @@ export async function GET(req: NextRequest) {
       (a: any, b: any) => (a.created_at || '').localeCompare(b.created_at || '')
     )
 
-    console.log(`[Tracking API] email=${decodedEmail}, phone=${decodedPhone}, lead=${!!lead}, events=${events.length}, tables=${orgTablesList.map(t => t.events).join(',')}`)
+    const clientIds = clientIdResults.flatMap((r: any) => r?.clientIds || [])
+    console.log(`[Tracking API] email=${decodedEmail}, phone=${decodedPhone}, clientIds=${clientIds.length}, lead=${!!lead}, events=${events.length}, tables=${orgTablesList.map(t => t.events).join(',')}`)
 
     return NextResponse.json({ lead, events })
   } catch (error) {
