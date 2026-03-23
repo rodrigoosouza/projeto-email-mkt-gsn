@@ -101,12 +101,14 @@ function fmtPct(v: number): string {
 }
 
 // --- Score helpers ---
-function calcPerformanceScore(ctr: number, convRate: number, winRate: number): number {
-  // Normalize each metric to 0-1 range (using reasonable benchmarks)
-  const nCtr = Math.min(ctr / 5, 1) // 5% CTR = max
-  const nConv = Math.min(convRate / 15, 1) // 15% conv rate = max
-  const nWin = Math.min(winRate / 60, 1) // 60% win rate = max
-  return (nCtr * 0.2 + nConv * 0.3 + nWin * 0.5) * 100
+// Score baseado em CONVERSÃO REAL: leads gerados no Meta + evolução no funil CRM
+function calcPerformanceScore(leads: number, deals: number, won: number, winRate: number, cpl: number): number {
+  // Pesos: vendas reais (40%) + win rate (25%) + deals no CRM (20%) + eficiência CPL (15%)
+  const nWon = Math.min(won / 3, 1) // 3 vendas = score máximo
+  const nWinRate = Math.min(winRate / 50, 1) // 50% win rate = max
+  const nDeals = Math.min(deals / 50, 1) // 50 deals = max
+  const nCplEff = cpl > 0 ? Math.min(30 / cpl, 1) : 0 // CPL R$30 ou menos = max
+  return (nWon * 0.4 + nWinRate * 0.25 + nDeals * 0.2 + nCplEff * 0.15) * 100
 }
 
 function scoreColor(score: number, max: number): string {
@@ -149,12 +151,7 @@ export default function ABTestingPage() {
   const [generalInsights, setGeneralInsights] = useState<string[]>([])
   const [suggestionsLoading, setSuggestionsLoading] = useState(false)
 
-  // Variation dialog
-  const [variationDialog, setVariationDialog] = useState(false)
-  const [variationCreative, setVariationCreative] = useState('')
-  const [variations, setVariations] = useState<Variation[]>([])
-  const [variationLoading, setVariationLoading] = useState(false)
-  const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
+  // (variation dialog removed)
 
   // Sort
   const [sortKey, setSortKey] = useState<SortKey>('score')
@@ -254,7 +251,7 @@ export default function ABTestingPage() {
         c.winRate = (crm.won + crm.lost) > 0 ? (crm.won / (crm.won + crm.lost)) * 100 : 0
       }
 
-      c.score = calcPerformanceScore(c.ctr, c.convRate, c.winRate)
+      c.score = calcPerformanceScore(c.leads, c.deals, c.won, c.winRate, c.cpl)
     })
 
     return Array.from(map.values())
@@ -522,7 +519,6 @@ export default function ABTestingPage() {
                         Score <SortIcon column="score" />
                       </button>
                     </TableHead>
-                    <TableHead className="text-center text-xs w-[90px]">Acao</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -637,17 +633,6 @@ export default function ABTestingPage() {
                               {c.score.toFixed(1)}
                             </span>
                           </div>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-xs h-7 px-2"
-                            onClick={() => handleGenerateVariation(c.name)}
-                          >
-                            <Sparkles className="h-3 w-3 mr-1" />
-                            Variar
-                          </Button>
                         </TableCell>
                       </TableRow>
                     )
@@ -780,83 +765,6 @@ export default function ABTestingPage() {
         </CardContent>
       </Card>
 
-      {/* Variation Dialog */}
-      <Dialog open={variationDialog} onOpenChange={setVariationDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-violet-500" />
-              Variacoes de Copy — {variationCreative.length > 40 ? variationCreative.slice(0, 40) + '...' : variationCreative}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            {variationLoading && (
-              <div className="flex flex-col items-center justify-center py-8 gap-3">
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground">Gerando variacoes com IA...</p>
-              </div>
-            )}
-
-            {!variationLoading && variations.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                <AlertTriangle className="h-8 w-8 mb-2 opacity-30" />
-                <p className="text-sm">Nao foi possivel gerar variacoes</p>
-              </div>
-            )}
-
-            {variations.map((v, i) => (
-              <Card key={i} className="relative">
-                <CardContent className="pt-5 pb-4">
-                  <div className="flex items-start justify-between mb-2">
-                    <Badge className="bg-violet-500/10 text-violet-600 border-0">
-                      Variacao {i + 1}
-                    </Badge>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-xs"
-                      onClick={() => handleCopyVariation(i, `Titulo: ${v.headline}\nTexto: ${v.primaryText}\nCTA: ${v.cta}`)}
-                    >
-                      {copiedIdx === i ? (
-                        <Check className="h-3 w-3 mr-1 text-emerald-500" />
-                      ) : (
-                        <Copy className="h-3 w-3 mr-1" />
-                      )}
-                      {copiedIdx === i ? 'Copiado!' : 'Copiar'}
-                    </Button>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground">Titulo:</p>
-                      <p className="text-sm font-semibold">{v.headline}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground">Texto principal:</p>
-                      <p className="text-sm">{v.primaryText}</p>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground">CTA:</p>
-                        <Badge variant="outline">{v.cta}</Badge>
-                      </div>
-                    </div>
-                    <div className="pt-2 border-t">
-                      <p className="text-xs font-medium text-muted-foreground">Racional:</p>
-                      <p className="text-xs text-muted-foreground italic">{v.rationale}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setVariationDialog(false)}>
-              Fechar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
