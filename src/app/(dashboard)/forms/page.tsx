@@ -98,7 +98,7 @@ export default function FormsPage() {
     return {
       script: `<script src="${baseUrl}/api/forms/${formId}/embed.js" async></script>`,
       inline: `<div id="plataforma-form-${formId}"></div>\n<script src="${baseUrl}/api/forms/${formId}/embed.js" async></script>`,
-      iframe: `<iframe src="${baseUrl}/f/${formId}" width="100%" height="600" frameborder="0" style="border:none;border-radius:12px;max-width:500px;"></iframe>`,
+      iframe: `<iframe src="${baseUrl}/f/${formId}" width="100%" height="700" frameborder="0" style="border:none;border-radius:12px;"></iframe>`,
       link: `${baseUrl}/f/${formId}`,
     }
   }
