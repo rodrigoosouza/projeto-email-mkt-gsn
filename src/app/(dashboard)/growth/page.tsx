@@ -554,7 +554,7 @@ export default function GrowthAnalysisPage() {
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-semibold">Todas as Vendas Realizadas ({wonDealsAll.length})</CardTitle>
                 <CardDescription className="text-xs">
-                  Total: {fmtC(wonDealsAll.reduce((s: number, d: any) => s + d.value, 0))} — Inclui vendas com e sem rastreio de criativo/publico
+                  Total: {fmt$(wonDealsAll.reduce((s: number, d: any) => s + d.value, 0))} — Inclui vendas com e sem rastreio de criativo/publico
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0">
@@ -577,7 +577,7 @@ export default function GrowthAnalysisPage() {
                               <p className="text-xs text-muted-foreground truncate max-w-[200px]">{d.title}</p>
                             </div>
                           </TableCell>
-                          <TableCell className="text-right font-bold text-sm text-emerald-600">{fmtC(d.value)}</TableCell>
+                          <TableCell className="text-right font-bold text-sm text-emerald-600">{fmt$(d.value)}</TableCell>
                           <TableCell>
                             <Badge variant="outline" className={cn('text-xs',
                               d.source === 'Meta Ads' ? 'border-blue-400 text-blue-600' :
