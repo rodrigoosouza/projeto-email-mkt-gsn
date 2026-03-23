@@ -98,6 +98,8 @@ export default function FormsPage() {
     return {
       script: `<script src="${baseUrl}/api/forms/${formId}/embed.js" async></script>`,
       inline: `<div id="plataforma-form-${formId}"></div>\n<script src="${baseUrl}/api/forms/${formId}/embed.js" async></script>`,
+      iframe: `<iframe src="${baseUrl}/f/${formId}" width="100%" height="600" frameborder="0" style="border:none;border-radius:12px;max-width:500px;"></iframe>`,
+      link: `${baseUrl}/f/${formId}`,
     }
   }
 
@@ -236,55 +238,57 @@ export default function FormsPage() {
       <Dialog open={!!embedFormId} onOpenChange={() => setEmbedFormId(null)}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Codigo de Embed - {embedForm?.name}</DialogTitle>
+            <DialogTitle>Compartilhar Formulario - {embedForm?.name}</DialogTitle>
           </DialogHeader>
           {embedCode && (
             <div className="space-y-4 py-2">
-              {embedForm?.form_type === 'inline' ? (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">
-                    Cole este codigo onde deseja exibir o formulario:
-                  </p>
-                  <div className="relative">
-                    <pre className="bg-muted p-3 rounded-md text-xs overflow-x-auto whitespace-pre-wrap break-all">
-                      {embedCode.inline}
-                    </pre>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="absolute top-1 right-1"
-                      onClick={() => copyToClipboard(embedCode.inline)}
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
+              {/* Link direto */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Link direto</p>
+                <div className="flex gap-2">
+                  <pre className="bg-muted p-2.5 rounded-md text-xs flex-1 overflow-x-auto">{embedCode.link}</pre>
+                  <Button size="sm" variant="outline" onClick={() => copyToClipboard(embedCode.link)}>
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
-              ) : (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">
-                    Cole este script antes do {'</body>'} do seu site:
-                  </p>
-                  <div className="relative">
-                    <pre className="bg-muted p-3 rounded-md text-xs overflow-x-auto whitespace-pre-wrap break-all">
-                      {embedCode.script}
-                    </pre>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="absolute top-1 right-1"
-                      onClick={() => copyToClipboard(embedCode.script)}
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
+                <p className="text-xs text-muted-foreground">Envie esse link por email, WhatsApp ou redes sociais.</p>
+              </div>
+
+              {/* Iframe (mais confiavel) */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Embed via iframe (recomendado)</p>
+                <div className="relative">
+                  <pre className="bg-muted p-3 rounded-md text-xs overflow-x-auto whitespace-pre-wrap break-all">{embedCode.iframe}</pre>
+                  <Button variant="ghost" size="sm" className="absolute top-1 right-1" onClick={() => copyToClipboard(embedCode.iframe)}>
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
-              )}
-              <p className="text-xs text-muted-foreground">
-                O formulario sera carregado automaticamente na pagina.
-                {embedForm?.form_type === 'popup' && ' Aparecera como pop-up apos um tempo.'}
-                {embedForm?.form_type === 'slide_in' && ' Aparecera como painel deslizante no canto.'}
-                {embedForm?.form_type === 'floating_button' && ' Aparecera como botao flutuante no canto inferior direito.'}
-              </p>
+                <p className="text-xs text-muted-foreground">Cole em qualquer pagina HTML. Funciona em WordPress, Wix, Webflow, etc.</p>
+              </div>
+
+              {/* Script (avancado) */}
+              <details className="space-y-2">
+                <summary className="text-sm font-medium cursor-pointer hover:text-foreground text-muted-foreground">Embed via JavaScript (avancado)</summary>
+                <div className="relative mt-2">
+                  <pre className="bg-muted p-3 rounded-md text-xs overflow-x-auto whitespace-pre-wrap break-all">
+                    {embedForm?.form_type === 'inline' ? embedCode.inline : embedCode.script}
+                  </pre>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="absolute top-1 right-1"
+                    onClick={() => copyToClipboard(embedForm?.form_type === 'inline' ? embedCode.inline : embedCode.script)}
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {embedForm?.form_type === 'inline' && 'Cole onde deseja exibir o formulario.'}
+                  {embedForm?.form_type === 'popup' && 'Cole antes do </body>. Aparece como pop-up.'}
+                  {embedForm?.form_type === 'slide_in' && 'Cole antes do </body>. Aparece como painel deslizante.'}
+                  {embedForm?.form_type === 'floating_button' && 'Cole antes do </body>. Aparece como botao flutuante.'}
+                </p>
+              </details>
             </div>
           )}
         </DialogContent>
