@@ -211,10 +211,17 @@ export async function aggregateGrowthData(orgId: string, fromDate: string, toDat
     lostReasonMap.set(reason, (lostReasonMap.get(reason) || 0) + 1)
   })
 
-  // Creatives in CRM
+  // Creatives in CRM — use ALL deals (not just period) to capture won deals from any time
+  const { data: allDealsWithUtm } = await admin
+    .from('pipedrive_deals')
+    .select('deal_id, value, status, utm_term, utm_content')
+    .eq('org_id', orgId)
+    .not('utm_term', 'is', null)
+    .neq('utm_term', '{{ad.name}}')
+
   const crmCreativeMap = new Map<string, { name: string; deals: number; open: number; won: number; lost: number; wonValue: number }>()
-  periodDeals.forEach((d: any) => {
-    const term = d.utm_term; if (!term || term === '{{ad.name}}') return
+  ;(allDealsWithUtm || []).forEach((d: any) => {
+    const term = d.utm_term; if (!term) return
     const e = crmCreativeMap.get(term) || { name: term, deals: 0, open: 0, won: 0, lost: 0, wonValue: 0 }
     e.deals++
     if (d.status === 'open') e.open++
