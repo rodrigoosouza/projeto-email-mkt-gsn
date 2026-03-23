@@ -35,6 +35,7 @@ import {
   Megaphone,
   Handshake,
   TrendingUp,
+  FlaskConical,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -110,6 +111,7 @@ const navigationGroups: NavGroup[] = [
       { name: 'CRM Funil', href: '/pipedrive', icon: Handshake },
       { name: 'Analise MKT e Vendas', href: '/growth', icon: TrendingUp },
       { name: 'IA Growth Copilot', href: '/growth/chat', icon: Zap },
+      { name: 'A/B Testing', href: '/ads/ab-testing', icon: FlaskConical },
       { name: 'Criar Campanha ADS', href: '/ads', icon: Megaphone },
       { name: 'Publicos', href: '/audience-exports', icon: Share2 },
     ],
