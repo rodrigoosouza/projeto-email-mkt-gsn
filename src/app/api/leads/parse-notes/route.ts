@@ -91,6 +91,17 @@ interface ParsedNoteData {
   website: string | null
   cidade: string | null
   estado: string | null
+  prioridade: string | null
+  data_reuniao: string | null
+  utm_source: string | null
+  utm_medium: string | null
+  utm_campaign: string | null
+  utm_content: string | null
+  utm_term: string | null
+  landing_page: string | null
+  fbclid: string | null
+  origem: string | null
+  pilares_diagnostico: Record<string, any> | null
   dores: string[]
   interesses: string[]
   observacoes: string | null
@@ -122,28 +133,39 @@ REGRAS:
 ${notesContent}
 ---
 
-JSON esperado:
+JSON esperado (extraia TODOS os campos que encontrar):
 {
   "company": "nome da empresa ou null",
   "cargo": "cargo/posicao do contato ou null",
-  "segmento": "segmento/setor da empresa ou null",
-  "porte": "porte da empresa (micro/pequena/media/grande) ou descricao de porte ou null",
+  "segmento": "segmento/setor/o que faz a empresa ou null",
+  "porte": "porte da empresa (micro/pequena/media/grande) ou descricao ou null",
   "faturamento": "faturamento mencionado ou null",
   "email": "email encontrado ou null",
-  "phone": "telefone encontrado ou null",
+  "phone": "telefone/whatsapp encontrado ou null",
   "cnpj": "CNPJ encontrado ou null",
   "score": numero_score_ou_null,
   "nivel": "nivel de maturidade/qualificacao ou null",
-  "funcionarios": "numero de funcionarios ou descricao ou null",
+  "funcionarios": "numero de funcionarios ou faixa ou null",
   "diagnostico": "resumo do diagnostico/avaliacao se houver ou null",
   "first_name": "primeiro nome do contato ou null",
   "last_name": "sobrenome do contato ou null",
   "website": "site da empresa ou null",
   "cidade": "cidade ou null",
   "estado": "UF ou null",
+  "prioridade": "urgencia/prioridade mencionada ou null",
+  "data_reuniao": "data/hora de reuniao agendada ou null",
+  "utm_source": "fonte de trafego (facebook, google, etc) ou null",
+  "utm_medium": "midia (cpc, organic, etc) ou null",
+  "utm_campaign": "nome da campanha ou null",
+  "utm_content": "conteudo/publico do anuncio ou null",
+  "utm_term": "termo/criativo do anuncio ou null",
+  "landing_page": "URL da landing page ou null",
+  "fbclid": "Facebook click ID ou null",
+  "origem": "origem do lead (facebook, google, organico, indicacao, etc) ou null",
   "dores": ["lista de dores/problemas mencionados"],
   "interesses": ["lista de interesses/necessidades mencionados"],
-  "observacoes": "outras observacoes relevantes encontradas ou null"
+  "pilares_diagnostico": {"processos": null, "pessoas": null, "clientes": null, "controle": null, "crescimento": null},
+  "observacoes": "outras observacoes relevantes ou null"
 }`,
       },
     ],
@@ -171,6 +193,17 @@ JSON esperado:
       website: parsed.website || null,
       cidade: parsed.cidade || null,
       estado: parsed.estado || null,
+      prioridade: parsed.prioridade || null,
+      data_reuniao: parsed.data_reuniao || null,
+      utm_source: parsed.utm_source || null,
+      utm_medium: parsed.utm_medium || null,
+      utm_campaign: parsed.utm_campaign || null,
+      utm_content: parsed.utm_content || null,
+      utm_term: parsed.utm_term || null,
+      landing_page: parsed.landing_page || null,
+      fbclid: parsed.fbclid || null,
+      origem: parsed.origem || null,
+      pilares_diagnostico: parsed.pilares_diagnostico || null,
       dores: Array.isArray(parsed.dores) ? parsed.dores : [],
       interesses: Array.isArray(parsed.interesses) ? parsed.interesses : [],
       observacoes: parsed.observacoes || null,
@@ -290,6 +323,17 @@ async function parseNotesForLead(
   if (parsedData.cidade) noteFields.cidade = parsedData.cidade
   if (parsedData.estado) noteFields.estado = parsedData.estado
   if (parsedData.website) noteFields.website = parsedData.website
+  if (parsedData.prioridade) noteFields.prioridade = parsedData.prioridade
+  if (parsedData.data_reuniao) noteFields.data_reuniao = parsedData.data_reuniao
+  if (parsedData.utm_source) noteFields.utm_source = parsedData.utm_source
+  if (parsedData.utm_medium) noteFields.utm_medium = parsedData.utm_medium
+  if (parsedData.utm_campaign) noteFields.utm_campaign = parsedData.utm_campaign
+  if (parsedData.utm_content) noteFields.utm_content = parsedData.utm_content
+  if (parsedData.utm_term) noteFields.utm_term = parsedData.utm_term
+  if (parsedData.landing_page) noteFields.landing_page = parsedData.landing_page
+  if (parsedData.fbclid) noteFields.fbclid = parsedData.fbclid
+  if (parsedData.origem) noteFields.origem = parsedData.origem
+  if (parsedData.pilares_diagnostico) noteFields.pilares_diagnostico = parsedData.pilares_diagnostico
   if (parsedData.dores.length > 0) noteFields.dores = parsedData.dores
   if (parsedData.interesses.length > 0) noteFields.interesses = parsedData.interesses
   if (parsedData.observacoes) noteFields.observacoes_pipedrive = parsedData.observacoes
