@@ -288,23 +288,62 @@ export function LeadEnrichmentCard({
     }
   }
 
-  // Auto-enrich on mount if company exists and not yet enriched
+  // Auto-enrich on mount: 1) Pipedrive notes → 2) IA research — tudo automático
   useEffect(() => {
     if (autoEnrichTriggered.current) return
     if (!companyName) return
 
-    const hasValidData = enrichmentData && (enrichmentData as any).resumo_ia
-    console.log('[AutoEnrich]', { companyName, enrichmentStatus, hasData: !!enrichmentData, hasResumoIA: !!(enrichmentData as any)?.resumo_ia })
-
-    // Only skip if already enriched WITH valid data, or currently enriching
+    const hasValidData = enrichmentData && (enrichmentData as any)?.resumo_ia
     if (enrichmentStatus === 'enriching') return
     if (enrichmentStatus === 'enriched' && hasValidData) return
 
     autoEnrichTriggered.current = true
-    const timer = setTimeout(() => doEnrich(), 500)
-    return () => clearTimeout(timer)
+
+    const autoRun = async () => {
+      // Step 1: Import from Pipedrive notes first (has real data)
+      try {
+        setStatus('enriching')
+        setPipedriveLoading(true)
+        const pipeRes = await fetch('/api/leads/parse-notes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ leadId }),
+        })
+        if (pipeRes.ok) {
+          const pipeData = await pipeRes.json()
+          if (pipeData.updated_fields?.length > 0) {
+            onEnrichmentComplete?.() // refresh lead data
+          }
+        }
+      } catch { /* continue to AI enrich */ }
+      finally { setPipedriveLoading(false) }
+
+      // Step 2: Enrich with AI research
+      try {
+        setLoading(true)
+        const enrichRes = await fetch('/api/leads/enrich', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ leadId }),
+        })
+        if (enrichRes.ok) {
+          const result = await enrichRes.json()
+          setData(result.enrichment_data)
+          setStatus('enriched')
+          onEnrichmentComplete?.()
+        } else {
+          setStatus('failed')
+        }
+      } catch {
+        setStatus('failed')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    setTimeout(autoRun, 300)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companyName, enrichmentStatus, enrichmentData])
+  }, [])
 
   const handleEnrich = doEnrich
 
