@@ -236,7 +236,7 @@ export default function FormsPage() {
 
       {/* Embed Code Dialog */}
       <Dialog open={!!embedFormId} onOpenChange={() => setEmbedFormId(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-md sm:max-w-lg w-[95vw]">
           <DialogHeader>
             <DialogTitle>Compartilhar Formulario - {embedForm?.name}</DialogTitle>
           </DialogHeader>
@@ -246,7 +246,7 @@ export default function FormsPage() {
               <div className="space-y-2">
                 <p className="text-sm font-medium">Link direto</p>
                 <div className="flex gap-2">
-                  <pre className="bg-muted p-2.5 rounded-md text-xs flex-1 overflow-x-auto">{embedCode.link}</pre>
+                  <pre className="bg-muted p-2.5 rounded-md text-xs flex-1 overflow-x-auto break-all whitespace-pre-wrap">{embedCode.link}</pre>
                   <Button size="sm" variant="outline" onClick={() => copyToClipboard(embedCode.link)}>
                     <Copy className="h-3.5 w-3.5" />
                   </Button>
