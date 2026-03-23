@@ -367,33 +367,64 @@ export function LeadInfoCard({ lead, onUpdate }: LeadInfoCardProps) {
               </div>
             )}
 
-            {/* Dados do Pipedrive/Enrichment (campos extras em custom_fields) */}
+            {/* Dados do Pipedrive/Enrichment */}
             {(() => {
               const cf = lead.custom_fields || {}
               const definedNames = new Set(customFieldDefs.map(d => d.name))
-              const LABEL_MAP: Record<string, string> = {
+
+              // Campos principais (sempre visíveis)
+              const MAIN_FIELDS: Record<string, string> = {
                 segmento: 'Segmento', porte: 'Porte', faturamento: 'Faturamento',
                 funcionarios: 'Funcionarios', cnpj: 'CNPJ', nivel_qualificacao: 'Nivel',
-                diagnostico_pipedrive: 'Diagnostico', cidade: 'Cidade', estado: 'Estado',
-                website: 'Website', prioridade: 'Prioridade', data_reuniao: 'Reuniao',
-                utm_source: 'Fonte', utm_medium: 'Midia', utm_campaign: 'Campanha',
-                utm_content: 'Publico', utm_term: 'Criativo', landing_page: 'Landing Page',
-                origem: 'Origem', fbclid: 'FBCLID',
+                cidade: 'Cidade', estado: 'Estado', website: 'Website',
+                prioridade: 'Prioridade', data_reuniao: 'Reuniao',
               }
-              const extraFields = Object.entries(cf)
-                .filter(([key, val]) => !definedNames.has(key) && val !== null && val !== undefined && val !== '' && LABEL_MAP[key])
+
+              // Campos de tracking (seção separada)
+              const TRACKING_FIELDS: Record<string, string> = {
+                utm_source: 'Fonte', utm_medium: 'Midia', utm_campaign: 'Campanha',
+                utm_content: 'Publico', utm_term: 'Criativo', origem: 'Origem',
+              }
+
+              // Campos escondidos (muito longos ou técnicos)
+              const HIDDEN = new Set(['fbclid', 'landing_page', 'diagnostico_pipedrive', 'pilares_diagnostico', 'observacoes_pipedrive'])
+
+              const mainFields = Object.entries(cf)
+                .filter(([key, val]) => !definedNames.has(key) && val && MAIN_FIELDS[key])
                 .filter(([, val]) => !Array.isArray(val) && typeof val !== 'object')
 
-              if (extraFields.length === 0) return null
+              const trackingFields = Object.entries(cf)
+                .filter(([key, val]) => !definedNames.has(key) && val && TRACKING_FIELDS[key])
+                .filter(([, val]) => !Array.isArray(val) && typeof val !== 'object')
+
+              if (mainFields.length === 0 && trackingFields.length === 0) return null
+
               return (
-                <div className="pt-4 border-t">
-                  <p className="text-sm font-medium text-muted-foreground mb-3">Dados Complementares</p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8">
-                    {extraFields.map(([key, val]) => (
-                      <InfoField key={key} label={LABEL_MAP[key] || key} value={String(val)} />
-                    ))}
-                  </div>
-                </div>
+                <>
+                  {mainFields.length > 0 && (
+                    <div className="pt-4 border-t">
+                      <p className="text-sm font-medium text-muted-foreground mb-3">Dados Complementares</p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8">
+                        {mainFields.map(([key, val]) => (
+                          <InfoField key={key} label={MAIN_FIELDS[key]} value={String(val)} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {trackingFields.length > 0 && (
+                    <div className="pt-4 border-t">
+                      <p className="text-sm font-medium text-muted-foreground mb-3">Rastreamento</p>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-y-3 gap-x-6">
+                        {trackingFields.map(([key, val]) => (
+                          <div key={key} className="space-y-0.5">
+                            <p className="text-xs text-muted-foreground">{TRACKING_FIELDS[key]}</p>
+                            <p className="text-xs font-medium truncate" title={String(val)}>{String(val)}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
               )
             })()}
 
