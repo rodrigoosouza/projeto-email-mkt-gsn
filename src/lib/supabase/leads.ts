@@ -1,6 +1,27 @@
 import { createClient } from './client'
 import type { Lead, LeadTag, CreateLeadPayload } from '@/lib/types'
 
+/**
+ * Trigger lead enrichment in background (fire-and-forget).
+ * Calls the enrich API without waiting for response.
+ */
+async function triggerEnrichment(leadId: string) {
+  try {
+    const baseUrl = typeof window !== 'undefined'
+      ? window.location.origin
+      : process.env.NEXT_PUBLIC_APP_URL || ''
+    if (!baseUrl) return
+
+    fetch(`${baseUrl}/api/leads/enrich`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ leadId }),
+    }).catch(() => {}) // fire and forget
+  } catch {
+    // silently fail — enrichment is optional
+  }
+}
+
 async function logLeadEvent(
   supabase: ReturnType<typeof createClient>,
   orgId: string,
@@ -104,6 +125,11 @@ export async function createLead(orgId: string, payload: CreateLeadPayload): Pro
 
   // Log created event
   await logLeadEvent(supabase, orgId, data.id, 'created', 'Lead criado', `Email: ${payload.email}`)
+
+  // Auto-enrich if lead has company (fire-and-forget, don't block creation)
+  if (payload.company) {
+    triggerEnrichment(data.id).catch(() => {})
+  }
 
   // Handle tags
   if (payload.tags?.length) {

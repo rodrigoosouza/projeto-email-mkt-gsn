@@ -7,11 +7,14 @@ export const maxDuration = 60
 
 export async function POST(req: NextRequest) {
   try {
-    // Auth check
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Nao autenticado' }, { status: 401 })
+    // Auth check — allow internal calls via x-internal header or authenticated users
+    const isInternal = req.headers.get('x-internal-key') === (process.env.SUPABASE_SERVICE_ROLE_KEY || '').slice(0, 20)
+    if (!isInternal) {
+      const supabase = await createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        return NextResponse.json({ error: 'Nao autenticado' }, { status: 401 })
+      }
     }
 
     const { leadId, companyName } = await req.json()
@@ -31,16 +34,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Lead nao encontrado' }, { status: 404 })
     }
 
-    // Verify user has access to this org
-    const { data: membership } = await supabase
-      .from('organization_members')
-      .select('id')
-      .eq('org_id', lead.org_id)
-      .eq('user_id', user.id)
-      .single()
-
-    if (!membership) {
-      return NextResponse.json({ error: 'Sem acesso a esta organizacao' }, { status: 403 })
+    // Verify user has access to this org (skip for internal calls)
+    if (!isInternal) {
+      const supabase = await createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: membership } = await supabase
+          .from('organization_members')
+          .select('id')
+          .eq('org_id', lead.org_id)
+          .eq('user_id', user.id)
+          .single()
+        if (!membership) {
+          return NextResponse.json({ error: 'Sem acesso a esta organizacao' }, { status: 403 })
+        }
+      }
     }
 
     // Determine company name to research

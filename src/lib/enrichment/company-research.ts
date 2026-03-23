@@ -113,57 +113,83 @@ async function searchCnpjWs(companyName: string): Promise<string | null> {
 }
 
 /**
- * Use AI with web search capability to find company data.
- * More reliable than simple CNPJ lookup — uses broader knowledge.
+ * Use AI to find company data with maximum precision.
+ * Two-step approach: first find CNPJ, then research company.
  */
 async function aiDeepResearch(
   companyName: string,
   personName?: string,
   personEmail?: string,
 ): Promise<{ cnpj: string | null; data: Partial<EnrichmentData> }> {
+  const emailDomain = personEmail?.split('@')[1] || ''
   const context = [
     `Empresa: "${companyName}"`,
     personName ? `Contato: ${personName}` : '',
     personEmail ? `Email: ${personEmail}` : '',
+    emailDomain && !emailDomain.includes('gmail') && !emailDomain.includes('hotmail') && !emailDomain.includes('yahoo') && !emailDomain.includes('outlook')
+      ? `Dominio corporativo: ${emailDomain} (provavelmente o site da empresa)`
+      : '',
   ].filter(Boolean).join('\n')
 
+  // Step 1: Find CNPJ with dedicated prompt (more focused = more accurate)
+  let foundCnpj: string | null = null
+  try {
+    const { content: cnpjContent } = await generateAI({
+      messages: [
+        {
+          role: 'system',
+          content: 'Voce e um especialista em dados empresariais brasileiros. Sua UNICA tarefa e encontrar o CNPJ de uma empresa. Responda SOMENTE com o CNPJ no formato XX.XXX.XXX/XXXX-XX. Se nao tiver CERTEZA ABSOLUTA do CNPJ correto, responda apenas: NULL',
+        },
+        {
+          role: 'user',
+          content: `Qual o CNPJ da empresa "${companyName}"?${emailDomain ? ` Site provavel: ${emailDomain}` : ''}${personName ? ` Socio/contato: ${personName}` : ''}`,
+        },
+      ],
+      maxTokens: 50,
+      temperature: 0,
+    })
+    const cnpjMatch = cnpjContent.match(/\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}/)
+    if (cnpjMatch) foundCnpj = cnpjMatch[0]
+  } catch { /* ignore */ }
+
+  // Step 2: Full company research
   const { content } = await generateAI({
     messages: [
       {
         role: 'system',
-        content: `Voce e um analista de inteligencia comercial B2B brasileiro. Sua missao e encontrar informacoes PRECISAS e VERIFICAVEIS sobre empresas brasileiras.
+        content: `Voce e um analista de inteligencia comercial B2B brasileiro SENIOR. Sua missao e criar um dossie COMPLETO e PRECISO sobre empresas brasileiras para equipes de vendas.
 
-REGRAS CRITICAS:
-- So inclua dados que voce tem CERTEZA. Se nao souber, use null.
-- CNPJ: so informe se tiver certeza absoluta. Um CNPJ errado e pior que nenhum.
-- Use o dominio do email para inferir o website da empresa.
-- Analise o nome da empresa para inferir o segmento.
-- Baseie dores e oportunidades no segmento REAL da empresa.
-- Para faturamento, use faixas amplas baseadas no porte provavel.
+REGRAS DE PRECISAO:
+- CNPJ: so informe se tiver certeza ABSOLUTA. Verifique se os digitos verificadores batem. Um CNPJ errado e INACEITAVEL.
+- Razao social: deve ser o nome EXATO registrado na Receita Federal.
+- Use o dominio do email corporativo para encontrar o website.
+- Analise o nome da empresa + segmento para gerar dores ESPECIFICAS (nao genericas).
+- As oportunidades de abordagem devem ser ACTIONABLE para um vendedor.
+- Se nao souber algo com certeza, use null. NUNCA invente dados factuais.
 
 Responda APENAS com JSON valido, sem markdown, sem explicacao.`,
       },
       {
         role: 'user',
-        content: `Pesquise e analise esta empresa brasileira:
+        content: `Crie um dossie comercial completo desta empresa brasileira:
 
 ${context}
 
-Retorne este JSON:
+JSON esperado:
 {
-  "cnpj": "XX.XXX.XXX/XXXX-XX ou null se nao tiver certeza",
-  "razao_social": "razao social oficial ou null",
+  "cnpj": "XX.XXX.XXX/XXXX-XX ou null",
+  "razao_social": "nome oficial na Receita ou null",
   "nome_fantasia": "nome fantasia ou null",
-  "segmento_ia": "segmento de atuacao da empresa",
+  "segmento_ia": "segmento especifico de atuacao",
   "porte_estimado": "MEI/ME/EPP/MEDIO/GRANDE",
-  "faturamento_estimado": "faixa estimada ex: R$ 1M - R$ 5M/ano",
-  "resumo_ia": "Resumo de 3-4 frases sobre a empresa: o que faz, para quem vende, diferenciais, tamanho aproximado. Seja especifico e util para um vendedor.",
-  "dores_provaveis": ["5 dores especificas e relevantes para o segmento desta empresa"],
-  "oportunidades_abordagem": ["5 angulos de abordagem comercial personalizados para esta empresa"],
-  "maturidade_digital": "baixa/media/alta - baseado no segmento e porte",
-  "website": "https://site.com.br ou inferido do email, ou null",
-  "linkedin_url": "https://linkedin.com/company/xxx ou null",
-  "socios_conhecidos": [{"nome": "Nome do Socio", "cargo": "Cargo/Funcao"}]
+  "faturamento_estimado": "R$ X - R$ Y/ano",
+  "resumo_ia": "Resumo de 3-4 frases: o que faz, mercado, diferenciais, porte. Util para vendedor que vai ligar.",
+  "dores_provaveis": ["5 dores ESPECIFICAS do segmento e porte desta empresa, nao genericas"],
+  "oportunidades_abordagem": ["5 angulos de abordagem CONCRETOS e personalizados"],
+  "maturidade_digital": "baixa/media/alta",
+  "website": "https://... ou null",
+  "linkedin_url": "https://linkedin.com/company/... ou null",
+  "socios_conhecidos": [{"nome": "Nome Completo", "cargo": "Cargo"}]
 }`,
       },
     ],
@@ -265,30 +291,49 @@ export async function researchCompany(
 ): Promise<EnrichmentData> {
   console.log(`[Enrichment] Researching: "${companyName}"`)
 
-  // Step 1: AI deep research (gets CNPJ + insights in one call)
+  // Step 1: AI deep research (dedicated CNPJ search + full company analysis)
   const aiResult = await aiDeepResearch(companyName, personName, personEmail)
-  console.log(`[Enrichment] AI found CNPJ: ${aiResult.cnpj || 'no'}`)
 
-  // Step 2: Find CNPJ from multiple sources
-  let cnpj = cnpjHint || aiResult.cnpj || null
+  // Step 2: Collect all possible CNPJs and validate each with BrasilAPI
+  const cnpjCandidates = [
+    cnpjHint,
+    aiResult.cnpj,
+    (aiResult.data as any)?.cnpj,
+  ].filter(Boolean) as string[]
 
-  if (!cnpj) {
-    // Try Casa dos Dados
-    cnpj = await searchCnpjCasaDados(companyName)
-    console.log(`[Enrichment] Casa dos Dados CNPJ: ${cnpj || 'not found'}`)
-  }
+  console.log(`[Enrichment] "${companyName}" — CNPJ candidates: ${cnpjCandidates.length}`)
 
-  if (!cnpj) {
-    // Try CNPJ.ws
-    cnpj = await searchCnpjWs(companyName)
-    console.log(`[Enrichment] CNPJ.ws: ${cnpj || 'not found'}`)
-  }
-
-  // Step 3: If we have CNPJ, get official data from BrasilAPI
   let cnpjData: BrasilApiCnpjData | null = null
-  if (cnpj) {
-    cnpjData = await fetchCnpjData(cnpj)
-    console.log(`[Enrichment] BrasilAPI data: ${cnpjData ? 'found' : 'not found'}`)
+  let cnpj: string | null = null
+
+  // Try each candidate until one validates with BrasilAPI
+  for (const candidate of cnpjCandidates) {
+    const cleaned = candidate.replace(/[^\d]/g, '')
+    if (cleaned.length !== 14) continue
+
+    const data = await fetchCnpjData(cleaned)
+    if (data && data.razao_social) {
+      cnpjData = data
+      cnpj = cleaned
+      console.log(`[Enrichment] CNPJ validated: ${cleaned} → ${data.razao_social}`)
+      break
+    }
+  }
+
+  // Step 3: If no CNPJ validated, try Casa dos Dados as last resort
+  if (!cnpjData) {
+    const casaCnpj = await searchCnpjCasaDados(companyName)
+    if (casaCnpj) {
+      cnpjData = await fetchCnpjData(casaCnpj)
+      if (cnpjData) {
+        cnpj = casaCnpj
+        console.log(`[Enrichment] Casa dos Dados CNPJ validated: ${casaCnpj}`)
+      }
+    }
+  }
+
+  if (!cnpjData) {
+    console.log(`[Enrichment] No CNPJ validated for "${companyName}" — using AI data only`)
   }
 
   // Step 4: Merge — BrasilAPI (official) takes priority, AI fills gaps

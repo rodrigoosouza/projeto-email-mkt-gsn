@@ -117,6 +117,17 @@ export async function POST(
           description: `Dados enviados via formulario "${form.name}"`,
           metadata: { form_id: form.id, form_name: form.name, source_url: sourceUrl },
         })
+
+        // Auto-enrich lead if has company (fire-and-forget, internal call)
+        if (lead.company && lead.enrichment_status !== 'enriched') {
+          const enrichUrl = `${process.env.NEXT_PUBLIC_APP_URL || request.headers.get('origin') || ''}/api/leads/enrich`
+          const internalKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').slice(0, 20)
+          fetch(enrichUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-internal-key': internalKey },
+            body: JSON.stringify({ leadId: lead.id }),
+          }).catch(() => {})
+        }
       }
     }
 
