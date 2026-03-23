@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Building2,
   Users,
@@ -237,6 +237,22 @@ export function LeadEnrichmentCard({
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<EnrichmentData | null>(enrichmentData || null)
   const [status, setStatus] = useState<EnrichmentStatus | null>(enrichmentStatus || null)
+  const autoEnrichTriggered = useRef(false)
+
+  // Auto-enrich: se tem empresa e nunca foi enriquecido, enriquece automaticamente
+  useEffect(() => {
+    if (autoEnrichTriggered.current) return
+    if (!companyName) return
+    if (status === 'enriched' || status === 'enriching') return
+    if (data && Object.keys(data).length > 0) return
+
+    autoEnrichTriggered.current = true
+    // Delay de 1s para não travar a renderização da página
+    const timer = setTimeout(() => {
+      handleEnrich()
+    }, 1000)
+    return () => clearTimeout(timer)
+  }, [companyName, status, data])
 
   const handleEnrich = async () => {
     if (!companyName) {
