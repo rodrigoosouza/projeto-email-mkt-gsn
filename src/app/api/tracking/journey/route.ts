@@ -105,26 +105,35 @@ export async function GET(req: NextRequest) {
     const lead = leadResults.flat()[0] || null
 
     // Step 1: Find client_ids associated with this email/phone
-    // Most events (page_view, scroll, etc) do NOT have email — only generate_lead does
-    // So we first find the client_id from events that DO have the email,
-    // then fetch ALL events for those client_ids
+    // Use separate queries instead of .or() to avoid PostgREST special character issues
     const clientIdResults = await Promise.all(
       orgTablesList.map(async (tables) => {
-        const orFilters: string[] = []
-        if (decodedEmail) orFilters.push(`email.eq.${decodedEmail}`)
-        for (const pv of phoneVariants) orFilters.push(`phone.eq.${pv}`)
-        if (orFilters.length === 0) return []
+        const allClientIds: string[] = []
 
-        const { data, error } = await tracking
-          .from(tables.events)
-          .select('client_id')
-          .or(orFilters.join(','))
-          .not('client_id', 'is', null)
-          .limit(50)
-        if (error) {
-          console.error(`[Tracking API] Error finding client_ids in ${tables.events}:`, error.message)
+        // Query by email
+        if (decodedEmail) {
+          const { data } = await tracking
+            .from(tables.events)
+            .select('client_id')
+            .eq('email', decodedEmail)
+            .not('client_id', 'is', null)
+            .limit(20)
+          if (data) allClientIds.push(...data.map((r: any) => r.client_id).filter(Boolean))
         }
-        return { tables, clientIds: Array.from(new Set((data || []).map((r: any) => r.client_id).filter(Boolean))) }
+
+        // Query by phone variants (separate query, no .or() issues)
+        if (phoneVariants.length > 0) {
+          const { data } = await tracking
+            .from(tables.events)
+            .select('client_id')
+            .in('phone', phoneVariants)
+            .not('client_id', 'is', null)
+            .limit(20)
+          if (data) allClientIds.push(...data.map((r: any) => r.client_id).filter(Boolean))
+        }
+
+        const uniqueIds = Array.from(new Set(allClientIds))
+        return { tables, clientIds: uniqueIds }
       })
     )
 
@@ -132,19 +141,27 @@ export async function GET(req: NextRequest) {
     const eventResults = await Promise.all(
       clientIdResults.map(async (result: any) => {
         if (!result || !result.clientIds || result.clientIds.length === 0) {
-          // Fallback: still try email/phone direct match
-          const orFilters: string[] = []
-          if (decodedEmail) orFilters.push(`email.eq.${decodedEmail}`)
-          for (const pv of phoneVariants) orFilters.push(`phone.eq.${pv}`)
-          if (orFilters.length === 0) return []
-
-          const { data } = await tracking
-            .from(result.tables.events)
-            .select('*')
-            .or(orFilters.join(','))
-            .order('created_at', { ascending: true })
-            .limit(500)
-          return data || []
+          // Fallback: try phone .in() directly (no .or() issues)
+          if (phoneVariants.length > 0) {
+            const { data } = await tracking
+              .from(result.tables.events)
+              .select('*')
+              .in('phone', phoneVariants)
+              .order('created_at', { ascending: true })
+              .limit(500)
+            if (data && data.length > 0) return data
+          }
+          // Fallback 2: try email
+          if (decodedEmail) {
+            const { data } = await tracking
+              .from(result.tables.events)
+              .select('*')
+              .eq('email', decodedEmail)
+              .order('created_at', { ascending: true })
+              .limit(500)
+            return data || []
+          }
+          return []
         }
 
         // Query by client_id — this gets ALL page_views, scrolls, etc

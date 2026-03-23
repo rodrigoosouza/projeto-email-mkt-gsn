@@ -239,22 +239,7 @@ export function LeadEnrichmentCard({
   const [status, setStatus] = useState<EnrichmentStatus | null>(enrichmentStatus || null)
   const autoEnrichTriggered = useRef(false)
 
-  // Auto-enrich: se tem empresa e nunca foi enriquecido, enriquece automaticamente
-  useEffect(() => {
-    if (autoEnrichTriggered.current) return
-    if (!companyName) return
-    if (status === 'enriched' || status === 'enriching') return
-    if (data && Object.keys(data).length > 0) return
-
-    autoEnrichTriggered.current = true
-    // Delay de 1s para não travar a renderização da página
-    const timer = setTimeout(() => {
-      handleEnrich()
-    }, 1000)
-    return () => clearTimeout(timer)
-  }, [companyName, status, data])
-
-  const handleEnrich = async () => {
+  const doEnrich = async () => {
     if (!companyName) {
       toast({
         title: 'Empresa nao informada',
@@ -298,6 +283,21 @@ export function LeadEnrichmentCard({
       setLoading(false)
     }
   }
+
+  // Auto-enrich on mount if company exists and not yet enriched
+  useEffect(() => {
+    if (autoEnrichTriggered.current) return
+    if (!companyName) return
+    if (enrichmentStatus === 'enriched' || enrichmentStatus === 'enriching') return
+    if (enrichmentData && Object.keys(enrichmentData).length > 2) return
+
+    autoEnrichTriggered.current = true
+    const timer = setTimeout(() => doEnrich(), 500)
+    return () => clearTimeout(timer)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handleEnrich = doEnrich
 
   const isEnriched = status === 'enriched' && data
   const isEnriching = status === 'enriching' || loading
