@@ -63,7 +63,8 @@ export async function POST(req: NextRequest) {
 
     try {
       // Run enrichment
-      const enrichmentData = await researchCompany(nameToResearch)
+      const personName = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || undefined
+      const enrichmentData = await researchCompany(nameToResearch, undefined, personName, lead.email || undefined)
 
       // Save enrichment data
       const { data: updatedLead, error: updateError } = await admin
