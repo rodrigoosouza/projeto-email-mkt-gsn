@@ -258,6 +258,7 @@ export interface BrandIdentity {
   primary_color?: string
   secondary_color?: string
   accent_color?: string
+  additional_colors?: string[]
   tone_of_voice?: string
   brand_values?: string[]
   visual_style?: string
@@ -267,6 +268,9 @@ export interface BrandIdentity {
   brand_personality?: string[]
   brand_promise?: string
   tagline_suggestions?: string[]
+  fonts?: string[]
+  logo_description?: string
+  style_guide_url?: string
 }
 
 // ============= INDUSTRY BENCHMARKS =============

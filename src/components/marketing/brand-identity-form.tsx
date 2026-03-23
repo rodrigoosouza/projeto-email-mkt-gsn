@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Save, Palette, Sparkles, Loader2, Crown } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Save, Palette, Sparkles, Loader2, Crown, Upload, FileText, Image, X, Check, Type } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -38,6 +38,7 @@ const defaultBrand: BrandIdentity = {
   primary_color: '#3b82f6',
   secondary_color: '#1e40af',
   accent_color: '#f59e0b',
+  additional_colors: [],
   tone_of_voice: '',
   brand_values: [],
   visual_style: '',
@@ -47,6 +48,15 @@ const defaultBrand: BrandIdentity = {
   brand_personality: [],
   brand_promise: '',
   tagline_suggestions: [],
+  fonts: [],
+  logo_description: '',
+  style_guide_url: '',
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 export function BrandIdentityForm({ profile, onRefresh }: BrandIdentityFormProps) {
@@ -58,6 +68,14 @@ export function BrandIdentityForm({ profile, onRefresh }: BrandIdentityFormProps
   const [valuesText, setValuesText] = useState('')
   const [personalityText, setPersonalityText] = useState('')
   const [taglinesText, setTaglinesText] = useState('')
+  const [fontsText, setFontsText] = useState('')
+
+  // Style guide upload state
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [filePreview, setFilePreview] = useState<string | null>(null)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [analysisComplete, setAnalysisComplete] = useState(false)
 
   useEffect(() => {
     if (profile?.brand_identity && Object.keys(profile.brand_identity).length > 0) {
@@ -65,6 +83,7 @@ export function BrandIdentityForm({ profile, onRefresh }: BrandIdentityFormProps
       setValuesText(profile.brand_identity.brand_values?.join(', ') || '')
       setPersonalityText(profile.brand_identity.brand_personality?.join(', ') || '')
       setTaglinesText(profile.brand_identity.tagline_suggestions?.join('\n') || '')
+      setFontsText(profile.brand_identity.fonts?.join(', ') || '')
     }
   }, [profile?.brand_identity])
 
@@ -77,6 +96,7 @@ export function BrandIdentityForm({ profile, onRefresh }: BrandIdentityFormProps
         brand_values: valuesText.split(',').map((v) => v.trim()).filter(Boolean),
         brand_personality: personalityText.split(',').map((v) => v.trim()).filter(Boolean),
         tagline_suggestions: taglinesText.split('\n').map((v) => v.trim()).filter(Boolean),
+        fonts: fontsText.split(',').map((v) => v.trim()).filter(Boolean),
       })
       toast({ title: 'Identidade salva' })
       onRefresh()
@@ -111,6 +131,7 @@ export function BrandIdentityForm({ profile, onRefresh }: BrandIdentityFormProps
       setValuesText(data.brand.brand_values?.join(', ') || '')
       setPersonalityText(data.brand.brand_personality?.join(', ') || '')
       setTaglinesText(data.brand.tagline_suggestions?.join('\n') || '')
+      setFontsText(data.brand.fonts?.join(', ') || fontsText)
 
       // Auto-save
       await saveBrandIdentity(currentOrg.id, data.brand)
@@ -124,11 +145,231 @@ export function BrandIdentityForm({ profile, onRefresh }: BrandIdentityFormProps
     }
   }
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'image/gif']
+    if (!allowedTypes.includes(file.type)) {
+      toast({ title: 'Tipo nao suportado', description: 'Envie PDF ou imagem (PNG, JPG, WebP).', variant: 'destructive' })
+      return
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: 'Arquivo muito grande', description: 'Maximo 10MB.', variant: 'destructive' })
+      return
+    }
+
+    setSelectedFile(file)
+    setAnalysisComplete(false)
+
+    if (file.type.startsWith('image/')) {
+      setFilePreview(URL.createObjectURL(file))
+    } else {
+      setFilePreview(null)
+    }
+
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const handleRemoveFile = () => {
+    setSelectedFile(null)
+    setFilePreview(null)
+    setAnalysisComplete(false)
+  }
+
+  const handleAnalyzeStyleGuide = async () => {
+    if (!currentOrg?.id || !selectedFile) return
+    setAnalyzing(true)
+    setAnalysisComplete(false)
+    try {
+      const formData = new FormData()
+      formData.append('file', selectedFile)
+      formData.append('orgId', currentOrg.id)
+
+      const res = await fetch('/api/marketing/analyze-brand', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Erro na analise')
+      }
+
+      const data = await res.json()
+      const extractedBrand = data.brand as BrandIdentity
+
+      // Merge extracted data into current brand state
+      setBrand((prev) => ({
+        ...prev,
+        ...extractedBrand,
+        // Keep existing values if extracted ones are empty
+        primary_color: extractedBrand.primary_color || prev.primary_color,
+        secondary_color: extractedBrand.secondary_color || prev.secondary_color,
+        accent_color: extractedBrand.accent_color || prev.accent_color,
+      }))
+
+      // Update text fields
+      if (extractedBrand.brand_values?.length) {
+        setValuesText(extractedBrand.brand_values.join(', '))
+      }
+      if (extractedBrand.brand_personality?.length) {
+        setPersonalityText(extractedBrand.brand_personality.join(', '))
+      }
+      if (extractedBrand.fonts?.length) {
+        setFontsText(extractedBrand.fonts.join(', '))
+      }
+
+      // Auto-save
+      await saveBrandIdentity(currentOrg.id, {
+        ...brand,
+        ...extractedBrand,
+        brand_values: extractedBrand.brand_values || brand.brand_values,
+        brand_personality: extractedBrand.brand_personality || brand.brand_personality,
+        fonts: extractedBrand.fonts || brand.fonts,
+        tagline_suggestions: extractedBrand.tagline_suggestions || brand.tagline_suggestions,
+      })
+
+      setAnalysisComplete(true)
+      toast({ title: 'Style Guide analisado!', description: 'Dados de identidade visual extraidos e preenchidos automaticamente.' })
+      onRefresh()
+    } catch (error) {
+      console.error('Erro:', error)
+      toast({
+        title: 'Erro na analise',
+        description: error instanceof Error ? error.message : 'Tente novamente.',
+        variant: 'destructive',
+      })
+    } finally {
+      setAnalyzing(false)
+    }
+  }
+
   const selectedArchetype = ARCHETYPES.find((a) => a.value === brand.brand_archetype)
 
   return (
     <div className="space-y-4">
-      {/* AI Generation */}
+      {/* Style Guide Upload */}
+      <Card className="border-violet-200 bg-violet-50/50 dark:border-violet-800 dark:bg-violet-950/20">
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Upload className="h-4 w-4 text-violet-600" />
+            Upload de Style Guide / Brand Guidelines
+          </CardTitle>
+          <CardDescription>
+            Envie o manual de identidade visual da marca (PDF ou imagem) e a IA vai extrair automaticamente
+            cores, tipografia, tom de voz e estilo visual.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Existing style guide link */}
+          {brand.style_guide_url && !selectedFile && (
+            <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-md">
+              <Check className="h-4 w-4 text-green-600 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-green-800 dark:text-green-200">Style Guide enviado</p>
+                <a
+                  href={brand.style_guide_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-green-600 hover:underline truncate block"
+                >
+                  {brand.style_guide_url}
+                </a>
+              </div>
+            </div>
+          )}
+
+          {/* Drop zone */}
+          {!selectedFile && (
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className="border-2 border-dashed border-violet-300 dark:border-violet-700 rounded-lg p-8 text-center cursor-pointer hover:border-violet-500 hover:bg-violet-100/50 dark:hover:bg-violet-900/20 transition-colors"
+            >
+              <Upload className="h-8 w-8 mx-auto text-violet-400 mb-2" />
+              <p className="text-sm font-medium">Clique para enviar o Style Guide</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                PDF ou imagem (PNG, JPG, WebP). Max 10MB.
+              </p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.png,.jpg,.jpeg,.webp,.gif"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+            </div>
+          )}
+
+          {/* Selected file */}
+          {selectedFile && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 border rounded-md bg-background">
+                <div className="flex items-center gap-3 min-w-0">
+                  {selectedFile.type.startsWith('image/') ? (
+                    <Image className="h-5 w-5 text-violet-500 shrink-0" />
+                  ) : (
+                    <FileText className="h-5 w-5 text-violet-500 shrink-0" />
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{selectedFile.name}</p>
+                    <p className="text-xs text-muted-foreground">{formatFileSize(selectedFile.size)}</p>
+                  </div>
+                  {analysisComplete && (
+                    <Badge variant="default" className="bg-green-600 shrink-0">
+                      <Check className="h-3 w-3 mr-1" />
+                      Analisado
+                    </Badge>
+                  )}
+                </div>
+                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleRemoveFile}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {/* Image preview */}
+              {filePreview && (
+                <div className="rounded-md border overflow-hidden bg-muted/30">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={filePreview}
+                    alt="Preview do Style Guide"
+                    className="max-h-48 w-full object-contain"
+                  />
+                </div>
+              )}
+
+              {/* Analyze button */}
+              <Button
+                onClick={handleAnalyzeStyleGuide}
+                disabled={analyzing}
+                className="w-full bg-violet-600 hover:bg-violet-700"
+                size="lg"
+              >
+                {analyzing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Analisando Style Guide com IA...
+                  </>
+                ) : analysisComplete ? (
+                  <>
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Analisar Novamente
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Analisar e Extrair Dados
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* AI Generation from Briefing */}
       <Card className="border-primary/20 bg-primary/5">
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">
@@ -204,7 +445,7 @@ export function BrandIdentityForm({ profile, onRefresh }: BrandIdentityFormProps
         </CardContent>
       </Card>
 
-      {/* Colors */}
+      {/* Colors & Visual Identity */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -249,12 +490,71 @@ export function BrandIdentityForm({ profile, onRefresh }: BrandIdentityFormProps
                 </div>
               ))}
             </div>
-            {/* Preview */}
+            {/* Main Color Preview */}
             <div className="flex gap-2 mt-3">
               <div className="h-12 flex-1 rounded-md" style={{ backgroundColor: brand.primary_color || '#3b82f6' }} />
               <div className="h-12 flex-1 rounded-md" style={{ backgroundColor: brand.secondary_color || '#1e40af' }} />
               <div className="h-12 flex-1 rounded-md" style={{ backgroundColor: brand.accent_color || '#f59e0b' }} />
             </div>
+          </div>
+
+          {/* Additional Colors (extracted from style guide) */}
+          {brand.additional_colors && brand.additional_colors.length > 0 && (
+            <div>
+              <Label className="text-sm font-medium mb-3 block">Cores Adicionais da Paleta</Label>
+              <div className="flex flex-wrap gap-3">
+                {brand.additional_colors.map((color, i) => (
+                  <div key={i} className="flex flex-col items-center gap-1">
+                    <div
+                      className="w-12 h-12 rounded-md border shadow-sm cursor-pointer"
+                      style={{ backgroundColor: color }}
+                      title={color}
+                      onClick={() => {
+                        navigator.clipboard.writeText(color)
+                        toast({ title: `Cor ${color} copiada!` })
+                      }}
+                    />
+                    <span className="text-xs font-mono text-muted-foreground">{color}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Clique em uma cor para copiar o codigo hexadecimal.
+              </p>
+            </div>
+          )}
+
+          {/* Fonts */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <Type className="h-4 w-4" />
+              Tipografia / Fontes (separadas por virgula)
+            </Label>
+            <Input
+              value={fontsText}
+              onChange={(e) => setFontsText(e.target.value)}
+              placeholder="Ex: Montserrat, Open Sans, Roboto"
+            />
+            {fontsText && (
+              <div className="flex flex-wrap gap-2 mt-1">
+                {fontsText.split(',').map((f) => f.trim()).filter(Boolean).map((font, i) => (
+                  <Badge key={i} variant="secondary" className="text-xs">
+                    {font}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Logo Description */}
+          <div className="space-y-2">
+            <Label>Descricao do Logo</Label>
+            <Textarea
+              value={brand.logo_description || ''}
+              onChange={(e) => setBrand((prev) => ({ ...prev, logo_description: e.target.value }))}
+              placeholder="Descreva o logo da marca: formato, cores, elementos graficos, tipografia usada..."
+              rows={3}
+            />
           </div>
 
           {/* Tone, style, promise */}
