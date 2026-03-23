@@ -92,7 +92,6 @@ const navigationGroups: NavGroup[] = [
     items: [
       { name: 'Leads', href: '/leads', icon: Users },
       { name: 'Segmentos', href: '/segments', icon: Filter },
-      { name: 'Formularios', href: '/forms', icon: FileInput },
     ],
   },
   {
@@ -119,6 +118,7 @@ const navigationGroups: NavGroup[] = [
     label: 'Web',
     items: [
       { name: 'Landing Pages', href: '/landing-pages', icon: Globe },
+      { name: 'Formularios', href: '/forms', icon: FileInput },
       { name: 'SEO', href: '/seo', icon: Search },
       { name: 'Tracking', href: '/tracking', icon: Activity },
       { name: 'Comportamento', href: '/tracking/analytics', icon: MousePointerClick },
