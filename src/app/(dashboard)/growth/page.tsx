@@ -252,6 +252,18 @@ export default function GrowthAnalysisPage() {
   }, [fAdsets, adsetMetaMap])
 
   // === CRIATIVOS NO CRM ===
+  const wonDealsAll = useMemo(() => {
+    return deals.filter((d: any) => d.status === 'won').map((d: any) => {
+      let source = 'Direto / Sem rastreio'
+      if (d.utm_source === 'facebook') source = 'Meta Ads'
+      else if (d.utm_source === 'google') source = 'Google Ads'
+      else if (d.utm_source === 'ig') source = 'Instagram'
+      else if (d.utm_source === 'manychat') source = 'ManyChat'
+      else if (d.utm_source) source = d.utm_source
+      return { title: d.title, personName: d.person_name, value: Number(d.value || 0), wonTime: d.won_time, utmTerm: d.utm_term, utmContent: d.utm_content, utmSource: d.utm_source, source }
+    }).sort((a: any, b: any) => (b.wonTime || '').localeCompare(a.wonTime || ''))
+  }, [deals])
+
   const creativesInCRM = useMemo(() => {
     const map = new Map()
     fDeals.forEach(d => {
@@ -537,12 +549,12 @@ export default function GrowthAnalysisPage() {
         </TabsContent>
 
           {/* All Won Deals */}
-          {snapshot?.crm?.allWonDeals && snapshot.crm.allWonDeals.length > 0 && (
+          {deals.filter((d: any) => d.status === 'won').length > 0 && (
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold">Todas as Vendas Realizadas ({snapshot.crm.allWonDeals.length})</CardTitle>
+                <CardTitle className="text-sm font-semibold">Todas as Vendas Realizadas ({wonDealsAll.length})</CardTitle>
                 <CardDescription className="text-xs">
-                  Total: {fmtC(snapshot.crm.allWonDeals.reduce((s: number, d: any) => s + d.value, 0))} — Inclui vendas com e sem rastreio de criativo/publico
+                  Total: {fmtC(wonDealsAll.reduce((s: number, d: any) => s + d.value, 0))} — Inclui vendas com e sem rastreio de criativo/publico
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0">
@@ -557,7 +569,7 @@ export default function GrowthAnalysisPage() {
                       <TableHead className="text-xs pr-4">Data</TableHead>
                     </TableRow></TableHeader>
                     <TableBody>
-                      {snapshot.crm.allWonDeals.map((d: any, i: number) => (
+                      {wonDealsAll.map((d: any, i: number) => (
                         <TableRow key={i}>
                           <TableCell className="pl-4">
                             <div>
