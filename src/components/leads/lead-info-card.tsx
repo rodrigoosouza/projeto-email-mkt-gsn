@@ -344,7 +344,7 @@ export function LeadInfoCard({ lead, onUpdate }: LeadInfoCardProps) {
               <InfoField label="ID Externo" value={lead.external_id} />
             </div>
 
-            {/* Custom Fields - Read Mode */}
+            {/* Custom Fields - Read Mode (defined fields) */}
             {customFieldDefs.length > 0 && (
               <div className="pt-4 border-t">
                 <p className="text-sm font-medium text-muted-foreground mb-3">Campos Personalizados</p>
@@ -366,6 +366,36 @@ export function LeadInfoCard({ lead, onUpdate }: LeadInfoCardProps) {
                 </div>
               </div>
             )}
+
+            {/* Dados do Pipedrive/Enrichment (campos extras em custom_fields) */}
+            {(() => {
+              const cf = lead.custom_fields || {}
+              const definedNames = new Set(customFieldDefs.map(d => d.name))
+              const LABEL_MAP: Record<string, string> = {
+                segmento: 'Segmento', porte: 'Porte', faturamento: 'Faturamento',
+                funcionarios: 'Funcionarios', cnpj: 'CNPJ', nivel_qualificacao: 'Nivel',
+                diagnostico_pipedrive: 'Diagnostico', cidade: 'Cidade', estado: 'Estado',
+                website: 'Website', prioridade: 'Prioridade', data_reuniao: 'Reuniao',
+                utm_source: 'Fonte', utm_medium: 'Midia', utm_campaign: 'Campanha',
+                utm_content: 'Publico', utm_term: 'Criativo', landing_page: 'Landing Page',
+                origem: 'Origem', fbclid: 'FBCLID',
+              }
+              const extraFields = Object.entries(cf)
+                .filter(([key, val]) => !definedNames.has(key) && val !== null && val !== undefined && val !== '' && LABEL_MAP[key])
+                .filter(([, val]) => !Array.isArray(val) && typeof val !== 'object')
+
+              if (extraFields.length === 0) return null
+              return (
+                <div className="pt-4 border-t">
+                  <p className="text-sm font-medium text-muted-foreground mb-3">Dados Complementares</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8">
+                    {extraFields.map(([key, val]) => (
+                      <InfoField key={key} label={LABEL_MAP[key] || key} value={String(val)} />
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
 
             <div className="flex items-center gap-4 pt-2 border-t">
               <div className="space-y-1">
