@@ -254,6 +254,15 @@ function NewLandingPagePage() {
     }
   }, [searchParams, currentOrg, strategyLoaded])
 
+  // Auto-select current org brand (skip brand selection screen)
+  useEffect(() => {
+    if (state.phase !== 'select_brand' || !currentOrg || strategyLoaded) return
+    const brand = orgNameToBrand(currentOrg.name)
+    if (brand) {
+      dispatch({ type: 'SELECT_BRAND', brand })
+    }
+  }, [currentOrg, state.phase, strategyLoaded])
+
   const handleSelectBrand = useCallback(
     (brand: Brand) => {
       dispatch({ type: 'SELECT_BRAND', brand })
