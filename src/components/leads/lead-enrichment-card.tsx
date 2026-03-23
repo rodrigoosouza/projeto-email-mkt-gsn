@@ -18,6 +18,7 @@ import {
   Clock,
   Loader2,
   ExternalLink,
+  Download,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -31,6 +32,8 @@ import { useToast } from '@/components/ui/use-toast'
 interface EnrichmentPartner {
   nome: string
   qualificacao: string
+  linkedin_url?: string
+  descricao?: string
 }
 
 interface EnrichmentData {
@@ -235,6 +238,7 @@ export function LeadEnrichmentCard({
 }: LeadEnrichmentCardProps) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
+  const [pipedriveLoading, setPipedriveLoading] = useState(false)
   const [data, setData] = useState<EnrichmentData | null>(enrichmentData || null)
   const [status, setStatus] = useState<EnrichmentStatus | null>(enrichmentStatus || null)
   const autoEnrichTriggered = useRef(false)
@@ -288,16 +292,60 @@ export function LeadEnrichmentCard({
   useEffect(() => {
     if (autoEnrichTriggered.current) return
     if (!companyName) return
-    if (enrichmentStatus === 'enriched' || enrichmentStatus === 'enriching') return
-    if (enrichmentData && Object.keys(enrichmentData).length > 2) return
+
+    const hasValidData = enrichmentData && (enrichmentData as any).resumo_ia
+    console.log('[AutoEnrich]', { companyName, enrichmentStatus, hasData: !!enrichmentData, hasResumoIA: !!(enrichmentData as any)?.resumo_ia })
+
+    // Only skip if already enriched WITH valid data, or currently enriching
+    if (enrichmentStatus === 'enriching') return
+    if (enrichmentStatus === 'enriched' && hasValidData) return
 
     autoEnrichTriggered.current = true
     const timer = setTimeout(() => doEnrich(), 500)
     return () => clearTimeout(timer)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [companyName, enrichmentStatus, enrichmentData])
 
   const handleEnrich = doEnrich
+
+  const handlePipedriveImport = async () => {
+    setPipedriveLoading(true)
+
+    try {
+      const response = await fetch('/api/leads/parse-notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadId }),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao importar dados do Pipedrive')
+      }
+
+      if (result.updated_fields && result.updated_fields.length > 0) {
+        toast({
+          title: 'Dados importados do Pipedrive',
+          description: result.message || `${result.updated_fields.length} campo(s) atualizado(s).`,
+        })
+        onEnrichmentComplete?.()
+      } else {
+        toast({
+          title: 'Nenhum dado novo encontrado',
+          description: result.error || result.message || 'As notas do Pipedrive nao continham dados novos para este lead.',
+        })
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao importar do Pipedrive',
+        description: error.message || 'Nao foi possivel importar dados das notas.',
+        variant: 'destructive',
+      })
+    } finally {
+      setPipedriveLoading(false)
+    }
+  }
 
   const isEnriched = status === 'enriched' && data
   const isEnriching = status === 'enriching' || loading
@@ -328,34 +376,54 @@ export function LeadEnrichmentCard({
           </div>
           <div className="ml-2">{getStatusBadge(status)}</div>
         </div>
-        <Button
-          size="sm"
-          variant={isEnriched ? 'outline' : 'default'}
-          onClick={handleEnrich}
-          disabled={isEnriching || !companyName}
-          className={
-            !isEnriched && companyName
-              ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0'
-              : ''
-          }
-        >
-          {isEnriching ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Enriquecendo...
-            </>
-          ) : isEnriched ? (
-            <>
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Atualizar
-            </>
-          ) : (
-            <>
-              <Sparkles className="mr-2 h-4 w-4" />
-              Enriquecer Empresa
-            </>
-          )}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handlePipedriveImport}
+            disabled={pipedriveLoading || isEnriching}
+          >
+            {pipedriveLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Importando...
+              </>
+            ) : (
+              <>
+                <Download className="mr-2 h-4 w-4" />
+                Importar do Pipedrive
+              </>
+            )}
+          </Button>
+          <Button
+            size="sm"
+            variant={isEnriched ? 'outline' : 'default'}
+            onClick={handleEnrich}
+            disabled={isEnriching || !companyName}
+            className={
+              !isEnriched && companyName
+                ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0'
+                : ''
+            }
+          >
+            {isEnriching ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Enriquecendo...
+              </>
+            ) : isEnriched ? (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Atualizar
+              </>
+            ) : (
+              <>
+                <Sparkles className="mr-2 h-4 w-4" />
+                Enriquecer Empresa
+              </>
+            )}
+          </Button>
+        </div>
       </CardHeader>
 
       <CardContent>
@@ -456,17 +524,33 @@ export function LeadEnrichmentCard({
                     {data.socios.map((socio, index) => (
                       <div
                         key={index}
-                        className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2"
+                        className="rounded-lg border bg-muted/30 px-3 py-2"
                       >
-                        <div className="flex items-center gap-2">
-                          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
-                            <span className="text-xs font-semibold text-blue-700 dark:text-blue-300">
-                              {socio.nome?.charAt(0) || '?'}
-                            </span>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
+                              <span className="text-xs font-semibold text-blue-700 dark:text-blue-300">
+                                {socio.nome?.charAt(0) || '?'}
+                              </span>
+                            </div>
+                            <span className="text-sm font-medium">{socio.nome}</span>
+                            {socio.linkedin_url && (
+                              <a
+                                href={socio.linkedin_url.startsWith('http') ? socio.linkedin_url : `https://${socio.linkedin_url}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center justify-center h-5 w-5 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+                                title={`LinkedIn de ${socio.nome}`}
+                              >
+                                <Linkedin className="h-3.5 w-3.5 text-blue-700" />
+                              </a>
+                            )}
                           </div>
-                          <span className="text-sm font-medium">{socio.nome}</span>
+                          <span className="text-xs text-muted-foreground">{socio.qualificacao}</span>
                         </div>
-                        <span className="text-xs text-muted-foreground">{socio.qualificacao}</span>
+                        {socio.descricao && (
+                          <p className="text-xs text-muted-foreground mt-1 pl-9">{socio.descricao}</p>
+                        )}
                       </div>
                     ))}
                   </div>

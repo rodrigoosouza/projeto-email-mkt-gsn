@@ -23,7 +23,7 @@ export interface EnrichmentData {
     uf: string
     cep: string
   } | null
-  socios: { nome: string; qualificacao: string }[]
+  socios: { nome: string; qualificacao: string; linkedin_url?: string; descricao?: string }[]
   capital_social: number | null
   faturamento_estimado: string | null
   segmento_ia: string | null
@@ -162,10 +162,18 @@ async function aiDeepResearch(
 REGRAS DE PRECISAO:
 - CNPJ: so informe se tiver certeza ABSOLUTA. Verifique se os digitos verificadores batem. Um CNPJ errado e INACEITAVEL.
 - Razao social: deve ser o nome EXATO registrado na Receita Federal.
-- Use o dominio do email corporativo para encontrar o website.
+- Use o dominio do email corporativo para encontrar o website real da empresa.
+- Se o email e corporativo (nao gmail/hotmail/yahoo/outlook), o dominio provavelmente e o site da empresa.
 - Analise o nome da empresa + segmento para gerar dores ESPECIFICAS (nao genericas).
 - As oportunidades de abordagem devem ser ACTIONABLE para um vendedor.
 - Se nao souber algo com certeza, use null. NUNCA invente dados factuais.
+
+PESQUISA DE LINKEDIN (MUITO IMPORTANTE):
+- Pesquise profundamente sobre esta empresa e seus socios/fundadores.
+- Encontre o perfil do LinkedIn de CADA socio se possivel (formato: https://linkedin.com/in/username).
+- Busque o LinkedIn da empresa: https://linkedin.com/company/nome-da-empresa
+- Encontre o website real da empresa.
+- Para cada socio, forneca uma breve descricao do background profissional.
 
 Responda APENAS com JSON valido, sem markdown, sem explicacao.`,
       },
@@ -189,7 +197,7 @@ JSON esperado:
   "maturidade_digital": "baixa/media/alta",
   "website": "https://... ou null",
   "linkedin_url": "https://linkedin.com/company/... ou null",
-  "socios_conhecidos": [{"nome": "Nome Completo", "cargo": "Cargo"}]
+  "socios_conhecidos": [{"nome": "Nome Completo", "cargo": "Cargo", "linkedin_url": "https://linkedin.com/in/username ou null", "descricao": "Breve descricao do background profissional"}]
 }`,
       },
     ],
@@ -216,6 +224,8 @@ JSON esperado:
         socios: (parsed.socios_conhecidos || []).map((s: any) => ({
           nome: s.nome,
           qualificacao: s.cargo || 'Sócio',
+          linkedin_url: s.linkedin_url && s.linkedin_url !== 'null' ? s.linkedin_url : undefined,
+          descricao: s.descricao && s.descricao !== 'null' ? s.descricao : undefined,
         })),
       },
     }
@@ -227,7 +237,7 @@ JSON esperado:
 
 // ============= BrasilAPI Lookup =============
 
-async function fetchCnpjData(cnpj: string): Promise<BrasilApiCnpjData | null> {
+export async function fetchCnpjData(cnpj: string): Promise<BrasilApiCnpjData | null> {
   try {
     const cleanCnpj = cnpj.replace(/[^\d]/g, '')
     if (cleanCnpj.length !== 14) return null
@@ -358,7 +368,18 @@ export async function researchCompany(
         }
       : null,
     socios: cnpjData?.qsa?.length
-      ? cnpjData.qsa.map((s) => ({ nome: s.nome_socio, qualificacao: s.qualificacao_socio }))
+      ? cnpjData.qsa.map((s) => {
+          // Try to match with AI data to get LinkedIn URLs
+          const aiMatch = (aiResult.data.socios || []).find(
+            (ai) => ai.nome && s.nome_socio && ai.nome.toLowerCase().includes(s.nome_socio.toLowerCase().split(' ')[0])
+          )
+          return {
+            nome: s.nome_socio,
+            qualificacao: s.qualificacao_socio,
+            linkedin_url: aiMatch?.linkedin_url,
+            descricao: aiMatch?.descricao,
+          }
+        })
       : (aiResult.data.socios || []),
     capital_social: cnpjData?.capital_social || null,
 

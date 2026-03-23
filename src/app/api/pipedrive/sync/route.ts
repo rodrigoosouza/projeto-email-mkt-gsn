@@ -127,6 +127,54 @@ async function syncPipedrive(
       }
     }
 
+    // ===== AUTO-PARSE NOTES for leads with empty fields =====
+    if (syncType === 'deals' || syncType === 'full') {
+      try {
+        // Find leads with empty fields that have matching Pipedrive deals
+        const { data: leadsToEnrich } = await admin
+          .from('leads')
+          .select('id, email, first_name, last_name, company, position, phone')
+          .eq('org_id', orgId)
+          .or('company.is.null,position.is.null,phone.is.null')
+          .limit(20)
+
+        if (leadsToEnrich && leadsToEnrich.length > 0) {
+          // Fire-and-forget: trigger note parsing in background via internal API
+          const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
+            ? `https://${process.env.VERCEL_URL}`
+            : ''
+
+          if (baseUrl) {
+            for (const lead of leadsToEnrich) {
+              // Match lead to a deal
+              const { data: matchingDeal } = await admin
+                .from('pipedrive_deals')
+                .select('deal_id')
+                .eq('org_id', orgId)
+                .eq('person_email', lead.email)
+                .limit(1)
+                .single()
+
+              if (matchingDeal) {
+                // Fire and forget — don't block sync
+                fetch(`${baseUrl}/api/leads/parse-notes`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'x-internal-key': (process.env.SUPABASE_SERVICE_ROLE_KEY || '').slice(0, 20),
+                  },
+                  body: JSON.stringify({ leadId: lead.id }),
+                }).catch(() => {}) // ignore errors — this is fire-and-forget
+              }
+            }
+          }
+        }
+      } catch (noteParseError) {
+        // Never let note parsing errors break the sync
+        console.warn('[Pipedrive Sync] Auto note parse error (non-fatal):', noteParseError)
+      }
+    }
+
     // Update sync log
     const duration = Date.now() - startTime
     if (syncLogId) {
