@@ -23,16 +23,27 @@ export interface EnrichmentData {
     uf: string
     cep: string
   } | null
-  socios: { nome: string; qualificacao: string; linkedin_url?: string; descricao?: string }[]
+  socios: { nome: string; qualificacao: string; linkedin_url?: string; descricao?: string; email_provavel?: string; tipo?: string }[]
+  funcionarios_chave: { nome: string; cargo: string; linkedin_url?: string; departamento?: string }[]
   capital_social: number | null
+  numero_funcionarios: string | null
   faturamento_estimado: string | null
+  ano_fundacao: string | null
   segmento_ia: string | null
   resumo_ia: string | null
+  produtos_servicos: string[]
+  mercado_alvo: string | null
+  concorrentes: string[]
   dores_provaveis: string[]
   oportunidades_abordagem: string[]
   maturidade_digital: string | null
+  presenca_digital: string | null
   website: string | null
   linkedin_url: string | null
+  instagram_url: string | null
+  facebook_url: string | null
+  tecnologias_usadas: string[]
+  noticias_recentes: string | null
   enriched_at: string
 }
 
@@ -183,25 +194,52 @@ Responda APENAS com JSON valido, sem markdown, sem explicacao.`,
 
 ${context}
 
-JSON esperado:
+JSON esperado (pesquise profundamente e preencha o maximo possivel):
 {
   "cnpj": "XX.XXX.XXX/XXXX-XX ou null",
   "razao_social": "nome oficial na Receita ou null",
   "nome_fantasia": "nome fantasia ou null",
   "segmento_ia": "segmento especifico de atuacao",
   "porte_estimado": "MEI/ME/EPP/MEDIO/GRANDE",
+  "numero_funcionarios": "estimativa de funcionarios (ex: '50-100' ou '~200')",
   "faturamento_estimado": "R$ X - R$ Y/ano",
-  "resumo_ia": "Resumo de 3-4 frases: o que faz, mercado, diferenciais, porte. Util para vendedor que vai ligar.",
-  "dores_provaveis": ["5 dores ESPECIFICAS do segmento e porte desta empresa, nao genericas"],
-  "oportunidades_abordagem": ["5 angulos de abordagem CONCRETOS e personalizados"],
+  "ano_fundacao": "ano de fundacao ou null",
+  "resumo_ia": "Resumo de 4-5 frases DETALHADO: o que faz, mercado alvo, diferenciais, porte, presenca digital. Util para vendedor que vai ligar.",
+  "produtos_servicos": ["lista dos principais produtos ou servicos da empresa"],
+  "mercado_alvo": "descricao do mercado alvo da empresa",
+  "concorrentes": ["3-5 concorrentes conhecidos no mesmo segmento"],
+  "dores_provaveis": ["5 dores ESPECIFICAS do segmento e porte desta empresa"],
+  "oportunidades_abordagem": ["5 angulos de abordagem CONCRETOS e personalizados para vendedor"],
   "maturidade_digital": "baixa/media/alta",
-  "website": "https://... ou null",
-  "linkedin_url": "https://linkedin.com/company/... ou null",
-  "socios_conhecidos": [{"nome": "Nome Completo", "cargo": "Cargo", "linkedin_url": "https://linkedin.com/in/username ou null", "descricao": "Breve descricao do background profissional"}]
+  "presenca_digital": "descricao da presenca online (tem site? redes sociais? blog? e-commerce?)",
+  "website": "https://site-real.com.br ou null",
+  "linkedin_company_url": "https://www.linkedin.com/company/nome-empresa/ ou null",
+  "instagram_url": "https://instagram.com/perfil ou null",
+  "facebook_url": "https://facebook.com/pagina ou null",
+  "socios_e_decisores": [
+    {
+      "nome": "Nome Completo",
+      "cargo": "CEO/Diretor/Socio/Gerente",
+      "linkedin_url": "https://www.linkedin.com/in/nome-sobrenome/ ou null",
+      "descricao": "Background: formacao, experiencia anterior, tempo na empresa",
+      "email_provavel": "nome@empresa.com.br ou null",
+      "tipo": "socio/diretor/gerente/decisor"
+    }
+  ],
+  "funcionarios_chave": [
+    {
+      "nome": "Nome do funcionario relevante",
+      "cargo": "Cargo na empresa",
+      "linkedin_url": "https://www.linkedin.com/in/... ou null",
+      "departamento": "comercial/marketing/operacoes/rh/financeiro/ti"
+    }
+  ],
+  "tecnologias_usadas": ["ferramentas/sistemas que a empresa provavelmente usa"],
+  "noticias_recentes": "alguma noticia ou evento recente sobre a empresa ou null"
 }`,
       },
     ],
-    maxTokens: 3000,
+    maxTokens: 4000,
     temperature: 0.2,
   })
 
@@ -214,18 +252,36 @@ JSON esperado:
         nome_fantasia: parsed.nome_fantasia || null,
         segmento_ia: parsed.segmento_ia || null,
         porte: parsed.porte_estimado || null,
+        numero_funcionarios: parsed.numero_funcionarios || null,
         faturamento_estimado: parsed.faturamento_estimado || null,
+        ano_fundacao: parsed.ano_fundacao || null,
         resumo_ia: parsed.resumo_ia || null,
+        produtos_servicos: parsed.produtos_servicos || [],
+        mercado_alvo: parsed.mercado_alvo || null,
+        concorrentes: parsed.concorrentes || [],
         dores_provaveis: parsed.dores_provaveis || [],
         oportunidades_abordagem: parsed.oportunidades_abordagem || [],
         maturidade_digital: parsed.maturidade_digital || null,
+        presenca_digital: parsed.presenca_digital || null,
         website: parsed.website || null,
-        linkedin_url: parsed.linkedin_url || null,
-        socios: (parsed.socios_conhecidos || []).map((s: any) => ({
+        linkedin_url: parsed.linkedin_company_url || parsed.linkedin_url || null,
+        instagram_url: parsed.instagram_url || null,
+        facebook_url: parsed.facebook_url || null,
+        tecnologias_usadas: parsed.tecnologias_usadas || [],
+        noticias_recentes: parsed.noticias_recentes || null,
+        socios: (parsed.socios_e_decisores || parsed.socios_conhecidos || []).map((s: any) => ({
           nome: s.nome,
           qualificacao: s.cargo || 'Sócio',
           linkedin_url: s.linkedin_url && s.linkedin_url !== 'null' ? s.linkedin_url : undefined,
+          email_provavel: s.email_provavel || undefined,
+          tipo: s.tipo || undefined,
           descricao: s.descricao && s.descricao !== 'null' ? s.descricao : undefined,
+        })),
+        funcionarios_chave: (parsed.funcionarios_chave || []).map((f: any) => ({
+          nome: f.nome,
+          cargo: f.cargo,
+          linkedin_url: f.linkedin_url && f.linkedin_url !== 'null' ? f.linkedin_url : undefined,
+          departamento: f.departamento || undefined,
         })),
       },
     }
@@ -384,14 +440,25 @@ export async function researchCompany(
     capital_social: cnpjData?.capital_social || null,
 
     // AI-generated insights
+    numero_funcionarios: aiResult.data.numero_funcionarios || null,
     faturamento_estimado: aiResult.data.faturamento_estimado || null,
+    ano_fundacao: aiResult.data.ano_fundacao || null,
     segmento_ia: aiResult.data.segmento_ia || null,
     resumo_ia: aiResult.data.resumo_ia || null,
+    produtos_servicos: aiResult.data.produtos_servicos || [],
+    mercado_alvo: aiResult.data.mercado_alvo || null,
+    concorrentes: aiResult.data.concorrentes || [],
     dores_provaveis: aiResult.data.dores_provaveis || [],
     oportunidades_abordagem: aiResult.data.oportunidades_abordagem || [],
     maturidade_digital: aiResult.data.maturidade_digital || null,
+    presenca_digital: aiResult.data.presenca_digital || null,
     website: aiResult.data.website || null,
     linkedin_url: aiResult.data.linkedin_url || null,
+    instagram_url: aiResult.data.instagram_url || null,
+    facebook_url: aiResult.data.facebook_url || null,
+    funcionarios_chave: aiResult.data.funcionarios_chave || [],
+    tecnologias_usadas: aiResult.data.tecnologias_usadas || [],
+    noticias_recentes: aiResult.data.noticias_recentes || null,
     enriched_at: new Date().toISOString(),
   }
 
