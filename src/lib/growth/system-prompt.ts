@@ -139,6 +139,28 @@ export function buildDataContext(snapshot: any): string {
     })
   }
 
+  if (s.crm.allWonDeals && s.crm.allWonDeals.length > 0) {
+    const totalWonValue = s.crm.allWonDeals.reduce((sum: number, d: any) => sum + d.value, 0)
+    lines.push('\nTODAS AS VENDAS REALIZADAS (' + s.crm.allWonDeals.length + ' vendas, R$ ' + totalWonValue.toFixed(0) + ' total):')
+    s.crm.allWonDeals.forEach((d: any) => {
+      const criativo = d.utmTerm ? `, Criativo: ${d.utmTerm}` : ''
+      const publico = d.utmContent ? `, Público: ${d.utmContent}` : ''
+      lines.push('- ' + d.title + ' (' + d.personName + '): R$ ' + d.value.toFixed(0) + ' — Fonte: ' + d.source + criativo + publico + ' — ' + (d.wonTime || '').split('T')[0])
+    })
+
+    // Summary by source
+    const sourceMap = new Map<string, { count: number; value: number }>()
+    s.crm.allWonDeals.forEach((d: any) => {
+      const e = sourceMap.get(d.source) || { count: 0, value: 0 }
+      e.count++; e.value += d.value
+      sourceMap.set(d.source, e)
+    })
+    lines.push('\nVendas por fonte:')
+    Array.from(sourceMap.entries()).sort((a, b) => b[1].value - a[1].value).forEach(([source, data]) => {
+      lines.push('- ' + source + ': ' + data.count + ' vendas, R$ ' + data.value.toFixed(0))
+    })
+  }
+
   // Tracking
   lines.push('\n### TRACKING GTM')
   lines.push('Sessões: ' + s.tracking.kpis.sessions + ' | Visitantes: ' + s.tracking.kpis.visitors + ' | Page Views: ' + s.tracking.kpis.pageViews + ' | Leads GTM: ' + s.tracking.kpis.leads + ' | Conv. Rate: ' + s.tracking.kpis.convRate.toFixed(2) + '%')

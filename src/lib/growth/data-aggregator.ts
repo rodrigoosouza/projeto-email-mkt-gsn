@@ -27,6 +27,7 @@ export interface GrowthDataSnapshot {
     audiencesInCRM: { name: string; deals: number; open: number; won: number; lost: number }[]
     recentActivities: { dealTitle: string; personName: string; activityType: string; subject: string; note: string; date: string }[]
     recentNotes: { dealTitle: string; personName: string; content: string; date: string }[]
+    allWonDeals: { title: string; personName: string; value: number; wonTime: string; utmTerm: string | null; utmContent: string | null; utmSource: string | null; source: string }[]
   }
   tracking: {
     kpis: { sessions: number; visitors: number; pageViews: number; leads: number; convRate: number }
@@ -408,6 +409,29 @@ export async function aggregateGrowthData(orgId: string, fromDate: string, toDat
       audiencesInCRM: Array.from(crmAudienceMap.values()).sort((a, b) => b.deals - a.deals).slice(0, 15),
       recentActivities,
       recentNotes,
+      allWonDeals: await (async () => {
+        const { data: wonDeals } = await admin
+          .from('pipedrive_deals')
+          .select('title, person_name, value, won_time, utm_term, utm_content, utm_source')
+          .eq('org_id', orgId)
+          .eq('status', 'won')
+          .order('won_time', { ascending: false })
+          .limit(50)
+        return (wonDeals || []).map((d: any) => {
+          let source = 'Direto / Sem rastreio'
+          if (d.utm_source === 'facebook') source = 'Meta Ads'
+          else if (d.utm_source === 'google') source = 'Google Ads'
+          else if (d.utm_source === 'ig') source = 'Instagram'
+          else if (d.utm_source === 'manychat') source = 'ManyChat'
+          else if (d.utm_source) source = d.utm_source
+          else if (d.title?.includes('Orgânico') || d.title?.includes('orgânico')) source = 'Orgânico'
+          return {
+            title: d.title, personName: d.person_name, value: Number(d.value || 0),
+            wonTime: d.won_time, utmTerm: d.utm_term, utmContent: d.utm_content,
+            utmSource: d.utm_source, source,
+          }
+        })
+      })(),
     },
     tracking: { kpis: trackingKpis, topSources, topPages, topStates },
     ga4: ga4Data,

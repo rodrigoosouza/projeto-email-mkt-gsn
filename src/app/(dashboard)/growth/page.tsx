@@ -536,6 +536,58 @@ export default function GrowthAnalysisPage() {
           </Card>
         </TabsContent>
 
+          {/* All Won Deals */}
+          {snapshot?.crm?.allWonDeals && snapshot.crm.allWonDeals.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold">Todas as Vendas Realizadas ({snapshot.crm.allWonDeals.length})</CardTitle>
+                <CardDescription className="text-xs">
+                  Total: {fmtC(snapshot.crm.allWonDeals.reduce((s: number, d: any) => s + d.value, 0))} — Inclui vendas com e sem rastreio de criativo/publico
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader><TableRow className="bg-muted/30">
+                      <TableHead className="text-xs pl-4">Cliente</TableHead>
+                      <TableHead className="text-right text-xs">Valor</TableHead>
+                      <TableHead className="text-xs">Fonte</TableHead>
+                      <TableHead className="text-xs">Criativo</TableHead>
+                      <TableHead className="text-xs">Publico</TableHead>
+                      <TableHead className="text-xs pr-4">Data</TableHead>
+                    </TableRow></TableHeader>
+                    <TableBody>
+                      {snapshot.crm.allWonDeals.map((d: any, i: number) => (
+                        <TableRow key={i}>
+                          <TableCell className="pl-4">
+                            <div>
+                              <p className="text-sm font-medium">{d.personName || '-'}</p>
+                              <p className="text-xs text-muted-foreground truncate max-w-[200px]">{d.title}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right font-bold text-sm text-emerald-600">{fmtC(d.value)}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={cn('text-xs',
+                              d.source === 'Meta Ads' ? 'border-blue-400 text-blue-600' :
+                              d.source === 'Instagram' ? 'border-pink-400 text-pink-600' :
+                              d.source === 'Google Ads' ? 'border-yellow-400 text-yellow-700' :
+                              d.source === 'ManyChat' ? 'border-purple-400 text-purple-600' :
+                              d.source === 'Orgânico' ? 'border-green-400 text-green-600' :
+                              'border-gray-300 text-gray-500'
+                            )}>{d.source}</Badge>
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{d.utmTerm || '-'}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground truncate max-w-[150px]">{d.utmContent || '-'}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground pr-4 whitespace-nowrap">{d.wonTime ? new Date(d.wonTime).toLocaleDateString('pt-BR') : '-'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
         {/* === FUNIL CRM === */}
         <TabsContent value="crm_funnel" className="space-y-4">
           <div className="grid gap-3 md:grid-cols-2">
