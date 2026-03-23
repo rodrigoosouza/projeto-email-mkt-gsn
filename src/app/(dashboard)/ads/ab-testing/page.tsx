@@ -101,14 +101,17 @@ function fmtPct(v: number): string {
 }
 
 // --- Score helpers ---
-// Score baseado em CONVERSÃO REAL: leads gerados no Meta + evolução no funil CRM
-function calcPerformanceScore(leads: number, deals: number, won: number, winRate: number, cpl: number): number {
-  // Pesos: vendas reais (40%) + win rate (25%) + deals no CRM (20%) + eficiência CPL (15%)
-  const nWon = Math.min(won / 3, 1) // 3 vendas = score máximo
-  const nWinRate = Math.min(winRate / 50, 1) // 50% win rate = max
-  const nDeals = Math.min(deals / 50, 1) // 50 deals = max
-  const nCplEff = cpl > 0 ? Math.min(30 / cpl, 1) : 0 // CPL R$30 ou menos = max
-  return (nWon * 0.4 + nWinRate * 0.25 + nDeals * 0.2 + nCplEff * 0.15) * 100
+// Score = Leads gerados + Vendas + Deals que NÃO foram perdidos (vivos no funil)
+function calcPerformanceScore(leads: number, deals: number, won: number, lost: number): number {
+  const alive = deals - lost // deals que ainda estão vivos (open + won)
+  const aliveRate = deals > 0 ? (alive / deals) * 100 : 0 // % não perdido
+
+  // Pesos: vendas (40%) + leads gerados (30%) + taxa de sobrevivência no funil (30%)
+  const nWon = Math.min(won / 3, 1)       // 3 vendas = score máximo
+  const nLeads = Math.min(leads / 100, 1)  // 100 leads = score máximo
+  const nAlive = aliveRate / 100            // 100% vivo = score máximo
+
+  return (nWon * 0.4 + nLeads * 0.3 + nAlive * 0.3) * 100
 }
 
 function scoreColor(score: number, max: number): string {
@@ -251,7 +254,7 @@ export default function ABTestingPage() {
         c.winRate = (crm.won + crm.lost) > 0 ? (crm.won / (crm.won + crm.lost)) * 100 : 0
       }
 
-      c.score = calcPerformanceScore(c.leads, c.deals, c.won, c.winRate, c.cpl)
+      c.score = calcPerformanceScore(c.leads, c.deals, c.won, c.lost)
     })
 
     return Array.from(map.values())
