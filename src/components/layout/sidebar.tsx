@@ -116,12 +116,18 @@ const navigationGroups: NavGroup[] = [
     ],
   },
   {
-    label: 'Mensageria',
+    label: 'Web',
     items: [
-      { name: 'WhatsApp', href: '/whatsapp', icon: MessageCircle },
-      { name: 'Fluxos', href: '/whatsapp/flows', icon: Workflow },
-      { name: 'SMS', href: '/sms', icon: Smartphone },
-      { name: 'Chatbot', href: '/chatbot', icon: Bot },
+      { name: 'Landing Pages', href: '/landing-pages', icon: Globe },
+      { name: 'SEO', href: '/seo', icon: Search },
+      { name: 'Tracking', href: '/tracking', icon: Activity },
+      { name: 'Comportamento', href: '/tracking/analytics', icon: MousePointerClick },
+    ],
+  },
+  {
+    label: 'Criativos',
+    items: [
+      { name: 'Videos', href: '/videos', icon: Video },
     ],
   },
   {
@@ -132,18 +138,12 @@ const navigationGroups: NavGroup[] = [
     ],
   },
   {
-    label: 'Criativos',
+    label: 'Mensageria',
     items: [
-      { name: 'Videos', href: '/videos', icon: Video },
-    ],
-  },
-  {
-    label: 'Web',
-    items: [
-      { name: 'Landing Pages', href: '/landing-pages', icon: Globe },
-      { name: 'SEO', href: '/seo', icon: Search },
-      { name: 'Tracking', href: '/tracking', icon: Activity },
-      { name: 'Comportamento', href: '/tracking/analytics', icon: MousePointerClick },
+      { name: 'WhatsApp', href: '/whatsapp', icon: MessageCircle },
+      { name: 'Fluxos', href: '/whatsapp/flows', icon: Workflow },
+      { name: 'SMS', href: '/sms', icon: Smartphone },
+      { name: 'Chatbot', href: '/chatbot', icon: Bot },
     ],
   },
   {
