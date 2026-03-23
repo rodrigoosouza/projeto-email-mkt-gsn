@@ -121,7 +121,6 @@ const navigationGroups: NavGroup[] = [
       { name: 'Formularios', href: '/forms', icon: FileInput },
       { name: 'SEO', href: '/seo', icon: Search },
       { name: 'Tracking', href: '/tracking', icon: Activity },
-      { name: 'Comportamento', href: '/tracking/analytics', icon: MousePointerClick },
     ],
   },
   {
