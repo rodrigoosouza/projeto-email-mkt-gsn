@@ -225,15 +225,16 @@ export default function PipedriveDashboardPage() {
   const filteredDeals = useMemo(() => {
     let filtered = deals
 
-    // Date filter (based on add_time)
+    // Date filter (based on update_time — shows deals with activity in the period)
     const range = getDateRange(dateFilter)
     if (range) {
       const fromTime = range.from.getTime()
       const toTime = range.to.getTime()
       filtered = filtered.filter((d) => {
-        if (!d.add_time) return false
+        const dateStr = d.update_time || d.add_time
+        if (!dateStr) return false
         try {
-          const t = new Date(d.add_time).getTime()
+          const t = new Date(dateStr).getTime()
           return t >= fromTime && t <= toTime
         } catch {
           return false
