@@ -19,6 +19,7 @@ import { getLead, deleteLead, getLeadTags } from '@/lib/supabase/leads'
 import { createClient } from '@/lib/supabase/client'
 import { LeadInfoCard } from '@/components/leads/lead-info-card'
 import { LeadEnrichmentCard } from '@/components/leads/lead-enrichment-card'
+import { LeadPipedriveCard } from '@/components/leads/lead-pipedrive-card'
 import { LeadTagsManager } from '@/components/leads/lead-tags-manager'
 import { LeadTimeline } from '@/components/leads/lead-timeline'
 import { LeadTrackingJourney } from '@/components/leads/lead-tracking-journey'
@@ -170,6 +171,13 @@ export default function LeadDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <LeadInfoCard lead={lead} onUpdate={handleLeadUpdate} />
+          {currentOrg && (
+            <LeadPipedriveCard
+              leadEmail={lead.email}
+              leadName={[lead.first_name, lead.last_name].filter(Boolean).join(' ')}
+              orgId={currentOrg.id}
+            />
+          )}
           <LeadEnrichmentCard
             leadId={lead.id}
             companyName={lead.company}

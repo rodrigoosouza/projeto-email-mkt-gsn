@@ -4,6 +4,7 @@
  * 1. Casa dos Dados API (search by company name → CNPJ)
  * 2. BrasilAPI (CNPJ → full company data)
  * 3. AI research (web knowledge + analysis)
+ * 4. Google Search → real LinkedIn profile URLs
  */
 
 import { generateAI, parseAIJson } from '@/lib/ai-client'
@@ -291,6 +292,150 @@ JSON esperado (pesquise profundamente e preencha o maximo possivel):
   }
 }
 
+// ============= LinkedIn Search via Google =============
+
+/**
+ * Search Google for a LinkedIn profile URL.
+ * Uses Google's web search and parses the HTML results.
+ */
+async function searchLinkedInProfile(personName: string, companyName?: string): Promise<string | null> {
+  try {
+    const query = companyName
+      ? `"${personName}" "${companyName}" site:linkedin.com/in`
+      : `"${personName}" site:linkedin.com/in`
+
+    const encoded = encodeURIComponent(query)
+    const response = await fetch(
+      `https://www.google.com/search?q=${encoded}&num=3&hl=pt-BR`,
+      {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml',
+          'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
+        },
+        signal: AbortSignal.timeout(8000),
+      }
+    )
+
+    if (!response.ok) return null
+
+    const html = await response.text()
+
+    // Extract LinkedIn URLs from Google results
+    const linkedinMatches = html.match(/https?:\/\/(?:www\.)?linkedin\.com\/in\/[a-zA-Z0-9\-_%]+/g)
+
+    if (linkedinMatches && linkedinMatches.length > 0) {
+      // Clean up and return the first unique LinkedIn URL
+      const cleanUrl = linkedinMatches[0].split('&')[0].split('%3F')[0].replace(/\/+$/, '')
+      // Basic validation: must have a username after /in/
+      const username = cleanUrl.split('/in/')[1]
+      if (username && username.length > 2 && username.length < 80) {
+        return cleanUrl
+      }
+    }
+
+    return null
+  } catch (error) {
+    console.warn(`[Enrichment] LinkedIn search failed for "${personName}":`, error)
+    return null
+  }
+}
+
+/**
+ * Search Google for a company LinkedIn page.
+ */
+async function searchLinkedInCompany(companyName: string): Promise<string | null> {
+  try {
+    const query = `"${companyName}" site:linkedin.com/company`
+    const encoded = encodeURIComponent(query)
+    const response = await fetch(
+      `https://www.google.com/search?q=${encoded}&num=3&hl=pt-BR`,
+      {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml',
+          'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
+        },
+        signal: AbortSignal.timeout(8000),
+      }
+    )
+
+    if (!response.ok) return null
+
+    const html = await response.text()
+    const matches = html.match(/https?:\/\/(?:www\.)?linkedin\.com\/company\/[a-zA-Z0-9\-_%]+/g)
+
+    if (matches && matches.length > 0) {
+      const cleanUrl = matches[0].split('&')[0].split('%3F')[0].replace(/\/+$/, '')
+      const slug = cleanUrl.split('/company/')[1]
+      if (slug && slug.length > 1 && slug.length < 80) {
+        return cleanUrl
+      }
+    }
+
+    return null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Enrich sócios and funcionários with real LinkedIn URLs from Google.
+ * Runs in parallel with a concurrency limit to avoid rate limiting.
+ */
+async function enrichLinkedInUrls(
+  companyName: string,
+  socios: EnrichmentData['socios'],
+  funcionarios: EnrichmentData['funcionarios_chave'],
+): Promise<{
+  socios: EnrichmentData['socios']
+  funcionarios: EnrichmentData['funcionarios_chave']
+  companyLinkedin: string | null
+}> {
+  // Search company LinkedIn
+  const companyLinkedin = await searchLinkedInCompany(companyName)
+
+  // Search LinkedIn for each person (with small delay to avoid Google blocking)
+  const enrichedSocios = [...socios]
+  for (let i = 0; i < enrichedSocios.length && i < 5; i++) {
+    const socio = enrichedSocios[i]
+    if (socio.linkedin_url) continue // already has URL
+
+    const url = await searchLinkedInProfile(socio.nome, companyName)
+    if (url) {
+      enrichedSocios[i] = { ...socio, linkedin_url: url }
+      console.log(`[Enrichment] LinkedIn found for ${socio.nome}: ${url}`)
+    }
+
+    // Small delay between requests to avoid rate limiting
+    if (i < enrichedSocios.length - 1) {
+      await new Promise(r => setTimeout(r, 500))
+    }
+  }
+
+  const enrichedFuncionarios = [...funcionarios]
+  for (let i = 0; i < enrichedFuncionarios.length && i < 5; i++) {
+    const func = enrichedFuncionarios[i]
+    if (func.linkedin_url) continue
+
+    const url = await searchLinkedInProfile(func.nome, companyName)
+    if (url) {
+      enrichedFuncionarios[i] = { ...func, linkedin_url: url }
+      console.log(`[Enrichment] LinkedIn found for ${func.nome}: ${url}`)
+    }
+
+    if (i < enrichedFuncionarios.length - 1) {
+      await new Promise(r => setTimeout(r, 500))
+    }
+  }
+
+  return {
+    socios: enrichedSocios,
+    funcionarios: enrichedFuncionarios,
+    companyLinkedin,
+  }
+}
+
 // ============= BrasilAPI Lookup =============
 
 export async function fetchCnpjData(cnpj: string): Promise<BrasilApiCnpjData | null> {
@@ -460,6 +605,33 @@ export async function researchCompany(
     tecnologias_usadas: aiResult.data.tecnologias_usadas || [],
     noticias_recentes: aiResult.data.noticias_recentes || null,
     enriched_at: new Date().toISOString(),
+  }
+
+  // Step 5: Enrich with REAL LinkedIn URLs from Google Search
+  try {
+    console.log(`[Enrichment] Searching real LinkedIn profiles for "${companyName}"...`)
+    const linkedinResults = await enrichLinkedInUrls(
+      companyName,
+      enrichment.socios,
+      enrichment.funcionarios_chave,
+    )
+
+    enrichment.socios = linkedinResults.socios
+    enrichment.funcionarios_chave = linkedinResults.funcionarios
+    if (linkedinResults.companyLinkedin && !enrichment.linkedin_url) {
+      enrichment.linkedin_url = linkedinResults.companyLinkedin
+    }
+
+    const totalLinkedins = [
+      ...linkedinResults.socios.filter(s => s.linkedin_url),
+      ...linkedinResults.funcionarios.filter(f => f.linkedin_url),
+      linkedinResults.companyLinkedin ? 'company' : null,
+    ].filter(Boolean).length
+
+    console.log(`[Enrichment] LinkedIn search done — ${totalLinkedins} profile(s) found`)
+  } catch (linkedinError) {
+    // Non-critical: enrichment still works without LinkedIn
+    console.warn('[Enrichment] LinkedIn search failed (non-fatal):', linkedinError)
   }
 
   return enrichment

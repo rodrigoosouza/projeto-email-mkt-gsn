@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: true,
         lead: updatedLead,
-        enrichment: enrichmentData,
+        enrichment_data: enrichmentData,
       })
     } catch (enrichError) {
       // Mark as failed
