@@ -382,30 +382,121 @@ function extractInstagramHandle(url: string): string | null {
   return match?.[1] || null
 }
 
+// ---------------------------------------------------------------------------
+// Google Search — find website and Instagram when URLs are unknown
+// ---------------------------------------------------------------------------
+
+async function searchGoogle(query: string): Promise<string | null> {
+  try {
+    const encoded = encodeURIComponent(query)
+    const response = await fetch(
+      `https://www.google.com/search?q=${encoded}&num=3&hl=pt-BR`,
+      {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml',
+          'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
+        },
+        signal: AbortSignal.timeout(8000),
+      }
+    )
+    if (!response.ok) return null
+    return await response.text()
+  } catch {
+    return null
+  }
+}
+
+async function findCompanyWebsite(companyName: string): Promise<string | null> {
+  try {
+    const html = await searchGoogle(`"${companyName}" site oficial`)
+    if (!html) return null
+
+    // Extract URLs from search results, skip social media and directories
+    const urlMatches = html.match(/https?:\/\/(?:www\.)?([a-zA-Z0-9\-]+\.[a-zA-Z]{2,}(?:\.[a-zA-Z]{2,})?)\/?/g)
+    if (!urlMatches) return null
+
+    const skipDomains = ['google.', 'facebook.', 'instagram.', 'linkedin.', 'twitter.', 'youtube.', 'tiktok.', 'wikipedia.', 'reclameaqui.', 'cnpj.', 'consultasocio.', 'casadosdados.']
+
+    for (const url of urlMatches) {
+      const clean = url.replace(/\/+$/, '')
+      if (skipDomains.some(d => clean.includes(d))) continue
+      if (clean.includes('webcache')) continue
+      console.log(`[WebScraper] Found website for "${companyName}": ${clean}`)
+      return clean
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+async function findInstagramHandle(companyName: string): Promise<string | null> {
+  try {
+    const html = await searchGoogle(`"${companyName}" site:instagram.com`)
+    if (!html) return null
+
+    const matches = html.match(/https?:\/\/(?:www\.)?instagram\.com\/([a-zA-Z0-9_.]+)/g)
+    if (!matches) return null
+
+    for (const url of matches) {
+      const handle = url.split('instagram.com/')[1]?.split(/[/?&]/)[0]
+      if (handle && handle.length > 1 && handle.length < 50 && !['p', 'reel', 'explore', 'stories', 'accounts'].includes(handle)) {
+        console.log(`[WebScraper] Found Instagram for "${companyName}": @${handle}`)
+        return handle
+      }
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Main orchestrator
+// ---------------------------------------------------------------------------
+
 export async function enrichFromWeb(
   website: string | null,
   instagramUrl: string | null,
   companyName: string
-): Promise<WebEnrichmentResult> {
+): Promise<WebEnrichmentResult & { found_website?: string; found_instagram?: string }> {
   console.log(`[WebScraper] Starting web enrichment for: ${companyName}`)
 
-  // Prepare promises
-  const websitePromise = website
-    ? scrapeWebsite(website)
-    : Promise.resolve(null)
-
-  const instagramHandle = instagramUrl
+  // Step 1: If no website or Instagram, search Google to find them
+  let siteUrl = website
+  let igHandle = instagramUrl
     ? extractInstagramHandle(instagramUrl) || instagramUrl.replace(/^@/, '')
     : null
-  const instagramPromise = instagramHandle
-    ? scrapeInstagram(instagramHandle)
+
+  if (!siteUrl || !igHandle) {
+    console.log(`[WebScraper] Searching Google for missing URLs...`)
+    const [foundSite, foundIg] = await Promise.allSettled([
+      !siteUrl ? findCompanyWebsite(companyName) : Promise.resolve(null),
+      !igHandle ? findInstagramHandle(companyName) : Promise.resolve(null),
+    ])
+
+    if (!siteUrl && foundSite.status === 'fulfilled' && foundSite.value) {
+      siteUrl = foundSite.value
+    }
+    if (!igHandle && foundIg.status === 'fulfilled' && foundIg.value) {
+      igHandle = foundIg.value
+    }
+  }
+
+  // Step 2: Run all scrapers in parallel
+  const websitePromise = siteUrl
+    ? scrapeWebsite(siteUrl)
+    : Promise.resolve(null)
+
+  const instagramPromise = igHandle
+    ? scrapeInstagram(igHandle)
     : Promise.resolve(null)
 
   const metaAdsPromise = companyName
     ? scrapeMetaAdLibrary(companyName)
     : Promise.resolve(null)
 
-  // Run all in parallel
   const [websiteResult, instagramResult, metaAdsResult] = await Promise.allSettled([
     websitePromise,
     instagramPromise,
@@ -416,5 +507,7 @@ export async function enrichFromWeb(
     website_data: websiteResult.status === 'fulfilled' ? websiteResult.value : null,
     instagram_data: instagramResult.status === 'fulfilled' ? instagramResult.value : null,
     meta_ads_data: metaAdsResult.status === 'fulfilled' ? metaAdsResult.value : null,
+    found_website: siteUrl && siteUrl !== website ? siteUrl : undefined,
+    found_instagram: igHandle && igHandle !== instagramUrl ? `https://instagram.com/${igHandle}` : undefined,
   }
 }

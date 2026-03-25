@@ -657,6 +657,14 @@ export async function researchCompany(
     enrichment.instagram_data = webResult.instagram_data
     enrichment.meta_ads_data = webResult.meta_ads_data
 
+    // Update URLs if Google found them and AI didn't
+    if (webResult.found_website && !enrichment.website) {
+      enrichment.website = webResult.found_website
+    }
+    if (webResult.found_instagram && !enrichment.instagram_url) {
+      enrichment.instagram_url = webResult.found_instagram
+    }
+
     // Merge website technologies with AI-generated ones
     if (webResult.website_data?.tecnologias?.length) {
       const existingTech = new Set(enrichment.tecnologias_usadas.map(t => t.toLowerCase()))
