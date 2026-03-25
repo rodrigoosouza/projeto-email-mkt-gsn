@@ -133,7 +133,7 @@ async function syncPipedrive(
         // Get all deals with email
         const { data: allDeals } = await admin
           .from('pipedrive_deals')
-          .select('deal_id,person_name,person_email,person_phone,org_name,owner_name,stage_name,status,utm_source,utm_medium,utm_campaign,utm_content,utm_term,add_time')
+          .select('deal_id,person_name,person_email,person_phone,org_name,owner_name,stage_name,status,utm_source,utm_medium,utm_campaign,utm_content,utm_term,add_time,update_time')
           .eq('org_id', orgId)
           .not('person_email', 'is', null)
 
@@ -163,6 +163,8 @@ async function syncPipedrive(
                 company: d.org_name || null,
                 source: d.utm_source || 'pipedrive',
                 external_id: String(d.deal_id),
+                created_at: d.add_time || new Date().toISOString(),
+                updated_at: d.update_time || d.add_time || new Date().toISOString(),
                 custom_fields: {
                   ...(d.utm_source ? { utm_source: d.utm_source } : {}),
                   ...(d.utm_medium ? { utm_medium: d.utm_medium } : {}),

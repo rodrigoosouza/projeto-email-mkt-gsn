@@ -75,6 +75,7 @@ function TableSkeleton() {
           <TableCell><Skeleton className="h-4 w-28" /></TableCell>
           <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
           <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
         </TableRow>
       ))}
     </>
@@ -240,6 +241,7 @@ export function LeadsTable({
               <TableHead>Criativo</TableHead>
               <TableHead>Etapa CRM</TableHead>
               <TableHead>Criado em</TableHead>
+              <TableHead>Atualizado em</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -298,11 +300,19 @@ export function LeadsTable({
                         <span className="text-xs text-muted-foreground">-</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {formatDistanceToNow(new Date(lead.created_at), {
-                        addSuffix: true,
-                        locale: ptBR,
-                      })}
+                    <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
+                      {new Date(lead.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                      <br />
+                      <span className="text-[10px]">{new Date(lead.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
+                      {lead.updated_at ? (
+                        <>
+                          {new Date(lead.updated_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                          <br />
+                          <span className="text-[10px]">{new Date(lead.updated_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                        </>
+                      ) : '-'}
                     </TableCell>
                   </TableRow>
                 )
