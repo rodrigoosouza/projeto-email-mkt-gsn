@@ -127,6 +127,75 @@ async function syncPipedrive(
       }
     }
 
+    // ===== AUTO-CREATE LEADS from new Pipedrive deals =====
+    if (syncType === 'deals' || syncType === 'full') {
+      try {
+        // Get all deals with email
+        const { data: allDeals } = await admin
+          .from('pipedrive_deals')
+          .select('deal_id,person_name,person_email,person_phone,org_name,owner_name,stage_name,status,utm_source,utm_medium,utm_campaign,utm_content,utm_term,add_time')
+          .eq('org_id', orgId)
+          .not('person_email', 'is', null)
+
+        if (allDeals && allDeals.length > 0) {
+          // Get existing lead emails to avoid duplicates
+          const { data: existingLeads } = await admin
+            .from('leads')
+            .select('email')
+            .eq('org_id', orgId)
+
+          const existingEmails = new Set((existingLeads || []).map(l => l.email?.toLowerCase()))
+
+          // Create leads for deals that don't have a matching lead
+          const newLeads = allDeals
+            .filter(d => d.person_email && !existingEmails.has(d.person_email.toLowerCase()))
+            .map(d => {
+              const nameParts = (d.person_name || '').split(' ')
+              const firstName = nameParts[0] || null
+              const lastName = nameParts.slice(1).join(' ') || null
+
+              return {
+                org_id: orgId,
+                email: d.person_email,
+                first_name: firstName,
+                last_name: lastName,
+                phone: d.person_phone || null,
+                company: d.org_name || null,
+                source: d.utm_source || 'pipedrive',
+                external_id: String(d.deal_id),
+                custom_fields: {
+                  ...(d.utm_source ? { utm_source: d.utm_source } : {}),
+                  ...(d.utm_medium ? { utm_medium: d.utm_medium } : {}),
+                  ...(d.utm_campaign ? { utm_campaign: d.utm_campaign } : {}),
+                  ...(d.utm_content ? { utm_content: d.utm_content } : {}),
+                  ...(d.utm_term ? { utm_term: d.utm_term } : {}),
+                  ...(d.owner_name ? { deal_owner: d.owner_name } : {}),
+                  ...(d.stage_name ? { deal_stage: d.stage_name } : {}),
+                  ...(d.status ? { deal_status: d.status } : {}),
+                  deal_id: d.deal_id,
+                  pipedrive_deal_id: d.deal_id,
+                },
+              }
+            })
+
+          if (newLeads.length > 0) {
+            // Batch upsert (onConflict handles duplicates)
+            const { error: insertError } = await admin
+              .from('leads')
+              .upsert(newLeads, { onConflict: 'org_id,email', ignoreDuplicates: true })
+
+            if (insertError) {
+              console.warn('[Pipedrive Sync] Lead creation error (non-fatal):', insertError.message)
+            } else {
+              console.log(`[Pipedrive Sync] Created ${newLeads.length} new leads from Pipedrive deals`)
+            }
+          }
+        }
+      } catch (leadCreateError) {
+        console.warn('[Pipedrive Sync] Auto lead creation error (non-fatal):', leadCreateError)
+      }
+    }
+
     // ===== AUTO-PARSE NOTES for leads with empty fields =====
     if (syncType === 'deals' || syncType === 'full') {
       try {
