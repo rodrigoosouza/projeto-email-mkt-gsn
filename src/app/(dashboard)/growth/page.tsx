@@ -122,10 +122,10 @@ export default function GrowthAnalysisPage() {
       const sb = createClient()
       const [c, ai, asi, am, asm, d, s] = await Promise.all([
         sb.from('meta_campaign_insights').select('id,campaign_id,campaign_name,date,impressions,reach,clicks,link_clicks,spend,cpc,cpm,ctr,leads,cost_per_lead,frequency').eq('org_id', orgId).order('date', { ascending: false }).range(0, 999),
-        sb.from('meta_ad_insights').select('id,ad_id,ad_name,adset_id,campaign_id,date,impressions,clicks,spend,leads,reach,ctr,cpc,cpm,link_clicks').eq('org_id', orgId).range(0, 999),
-        sb.from('meta_adset_insights').select('id,adset_id,adset_name,campaign_id,date,impressions,clicks,spend,leads,reach').eq('org_id', orgId).range(0, 999),
-        sb.from('meta_ads').select('id,ad_id,name,adset_id,campaign_id,status,image_url,thumbnail_url').eq('org_id', orgId).range(0, 999),
-        sb.from('meta_adsets').select('id,adset_id,name,campaign_id,status,targeting').eq('org_id', orgId).range(0, 999),
+        sb.from('meta_ad_insights').select('id,ad_id,date,impressions,reach,clicks,link_clicks,spend,cpc,cpm,ctr,conversions,leads,actions').eq('org_id', orgId).range(0, 999),
+        sb.from('meta_adset_insights').select('id,adset_id,date,impressions,reach,clicks,link_clicks,spend,cpc,cpm,ctr,leads').eq('org_id', orgId).range(0, 999),
+        sb.from('meta_ads').select('id,ad_id,adset_id,campaign_id,name,status,image_url,headline').eq('org_id', orgId).range(0, 999),
+        sb.from('meta_adsets').select('id,adset_id,campaign_id,name,status,targeting').eq('org_id', orgId).range(0, 999),
         sb.from('pipedrive_deals').select('deal_id,title,value,currency,status,stage_id,stage_name,pipeline_name,person_name,person_email,org_name,owner_name,add_time,update_time,won_time,lost_time,lost_reason,utm_source,utm_medium,utm_campaign,utm_content,utm_term').eq('org_id', orgId).order('add_time', { ascending: false }).range(0, 999),
         sb.from('pipedrive_stages').select('stage_id,name,order_nr,pipeline_name').eq('org_id', orgId).order('order_nr', { ascending: true }),
       ])
