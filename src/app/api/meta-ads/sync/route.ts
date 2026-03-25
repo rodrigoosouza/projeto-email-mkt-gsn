@@ -324,7 +324,7 @@ export async function GET(request: NextRequest) {
   const results: Record<string, any> = {}
   for (const account of accounts) {
     results[account.ad_account_id] = await syncAccount(
-      admin, account.org_id, account, 7, ['campaigns']
+      admin, account.org_id, account, 7, ['campaigns', 'adsets', 'ads']
     )
   }
 
