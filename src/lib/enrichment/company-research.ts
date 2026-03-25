@@ -5,9 +5,11 @@
  * 2. BrasilAPI (CNPJ → full company data)
  * 3. AI research (web knowledge + analysis)
  * 4. Google Search → real LinkedIn profile URLs
+ * 5. Web scraping (Firecrawl site, Instagram, Meta Ad Library)
  */
 
 import { generateAI, parseAIJson } from '@/lib/ai-client'
+import { enrichFromWeb, type WebsiteData, type InstagramData, type MetaAdData } from './web-scraper'
 
 export interface EnrichmentData {
   cnpj: string | null
@@ -45,6 +47,10 @@ export interface EnrichmentData {
   facebook_url: string | null
   tecnologias_usadas: string[]
   noticias_recentes: string | null
+  // Web scraping data
+  website_data: WebsiteData | null
+  instagram_data: InstagramData | null
+  meta_ads_data: MetaAdData | null
   enriched_at: string
 }
 
@@ -604,6 +610,10 @@ export async function researchCompany(
     funcionarios_chave: aiResult.data.funcionarios_chave || [],
     tecnologias_usadas: aiResult.data.tecnologias_usadas || [],
     noticias_recentes: aiResult.data.noticias_recentes || null,
+    // Web scraping (filled in Step 6)
+    website_data: null,
+    instagram_data: null,
+    meta_ads_data: null,
     enriched_at: new Date().toISOString(),
   }
 
@@ -632,6 +642,39 @@ export async function researchCompany(
   } catch (linkedinError) {
     // Non-critical: enrichment still works without LinkedIn
     console.warn('[Enrichment] LinkedIn search failed (non-fatal):', linkedinError)
+  }
+
+  // Step 6: Web scraping — site, Instagram, Meta Ad Library (in parallel)
+  try {
+    console.log(`[Enrichment] Scraping web sources for "${companyName}"...`)
+    const webResult = await enrichFromWeb(
+      enrichment.website,
+      enrichment.instagram_url,
+      companyName,
+    )
+
+    enrichment.website_data = webResult.website_data
+    enrichment.instagram_data = webResult.instagram_data
+    enrichment.meta_ads_data = webResult.meta_ads_data
+
+    // Merge website technologies with AI-generated ones
+    if (webResult.website_data?.tecnologias?.length) {
+      const existingTech = new Set(enrichment.tecnologias_usadas.map(t => t.toLowerCase()))
+      for (const tech of webResult.website_data.tecnologias) {
+        if (!existingTech.has(tech.toLowerCase())) {
+          enrichment.tecnologias_usadas.push(tech)
+        }
+      }
+    }
+
+    const sources = [
+      webResult.website_data ? 'site' : null,
+      webResult.instagram_data ? 'instagram' : null,
+      webResult.meta_ads_data ? 'meta_ads' : null,
+    ].filter(Boolean)
+    console.log(`[Enrichment] Web scraping done — sources: ${sources.join(', ') || 'none'}`)
+  } catch (webError) {
+    console.warn('[Enrichment] Web scraping failed (non-fatal):', webError)
   }
 
   return enrichment

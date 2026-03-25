@@ -27,6 +27,8 @@ import {
   Swords,
   UserCheck,
   Mail,
+  MessageSquareQuote,
+  Megaphone,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -113,6 +115,40 @@ interface EnrichmentData {
   linkedin_url?: string | null
   instagram_url?: string | null
   facebook_url?: string | null
+
+  // Website scraping
+  website_data?: {
+    descricao?: string
+    produtos_servicos?: string[]
+    equipe?: { nome: string; cargo: string }[]
+    depoimentos?: string[]
+    tecnologias?: string[]
+    diferenciais?: string[]
+    cta_principal?: string
+    tem_blog?: boolean
+    tem_ecommerce?: boolean
+    tem_chat?: boolean
+  } | null
+
+  // Instagram
+  instagram_data?: {
+    username?: string
+    full_name?: string
+    bio?: string
+    followers?: number
+    following?: number
+    posts_count?: number
+    is_business?: boolean
+    external_url?: string
+  } | null
+
+  // Meta Ads Library
+  meta_ads_data?: {
+    total_active_ads?: number
+    ads?: { ad_creative_body?: string; ad_creative_link_title?: string; page_name?: string }[]
+    plataformas?: string[]
+    tipos_criativos?: string[]
+  } | null
 
   // Metadata
   enriched_at?: string
@@ -931,6 +967,252 @@ export function LeadEnrichmentCard({
                   )}
                 </div>
               </CollapsibleSection>
+            )}
+
+            {/* Analise do Site */}
+            {data.website_data && (
+              <>
+                <Separator />
+                <CollapsibleSection title="Analise do Site" icon={Globe} iconColor="text-blue-500" defaultOpen={false}>
+                  <div className="space-y-4">
+                    {data.website_data.descricao && (
+                      <p className="text-sm leading-relaxed">{data.website_data.descricao}</p>
+                    )}
+
+                    {/* Feature badges */}
+                    <div className="flex flex-wrap gap-2">
+                      {data.website_data.tem_blog !== undefined && (
+                        <Badge className={`border-0 text-xs ${data.website_data.tem_blog ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}>
+                          Blog {data.website_data.tem_blog ? '✓' : '✗'}
+                        </Badge>
+                      )}
+                      {data.website_data.tem_ecommerce !== undefined && (
+                        <Badge className={`border-0 text-xs ${data.website_data.tem_ecommerce ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}>
+                          E-commerce {data.website_data.tem_ecommerce ? '✓' : '✗'}
+                        </Badge>
+                      )}
+                      {data.website_data.tem_chat !== undefined && (
+                        <Badge className={`border-0 text-xs ${data.website_data.tem_chat ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}>
+                          Chat {data.website_data.tem_chat ? '✓' : '✗'}
+                        </Badge>
+                      )}
+                      {data.website_data.cta_principal && (
+                        <Badge variant="outline" className="text-xs">
+                          CTA: {data.website_data.cta_principal}
+                        </Badge>
+                      )}
+                    </div>
+
+                    {/* Diferenciais */}
+                    {data.website_data.diferenciais && data.website_data.diferenciais.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-2">
+                          Diferenciais
+                        </p>
+                        <ul className="space-y-1.5">
+                          {data.website_data.diferenciais.map((item, index) => (
+                            <li key={index} className="flex items-start gap-2 text-sm">
+                              <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-blue-400 shrink-0" />
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Tecnologias */}
+                    {data.website_data.tecnologias && data.website_data.tecnologias.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider mb-2">
+                          Tecnologias Detectadas
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {data.website_data.tecnologias.map((tech, index) => (
+                            <Badge key={index} variant="secondary" className="text-xs bg-cyan-50 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400 border-0">
+                              {tech}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Equipe */}
+                    {data.website_data.equipe && data.website_data.equipe.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-2">
+                          Equipe
+                        </p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {data.website_data.equipe.map((pessoa, index) => (
+                            <div key={index} className="rounded-lg border bg-muted/30 px-3 py-2">
+                              <p className="text-sm font-medium">{pessoa.nome}</p>
+                              <p className="text-xs text-muted-foreground">{pessoa.cargo}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Depoimentos */}
+                    {data.website_data.depoimentos && data.website_data.depoimentos.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-2">
+                          Depoimentos
+                        </p>
+                        <div className="space-y-2">
+                          {data.website_data.depoimentos.map((depo, index) => (
+                            <div key={index} className="rounded-lg border-l-4 border-amber-300 dark:border-amber-600 bg-amber-50 dark:bg-amber-950/20 px-3 py-2">
+                              <div className="flex items-start gap-2">
+                                <MessageSquareQuote className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                                <p className="text-sm italic">{depo}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Produtos/Servicos do site */}
+                    {data.website_data.produtos_servicos && data.website_data.produtos_servicos.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-orange-600 dark:text-orange-400 uppercase tracking-wider mb-2">
+                          Produtos/Servicos (do site)
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {data.website_data.produtos_servicos.map((item, index) => (
+                            <Badge key={index} variant="secondary" className="text-xs">
+                              {item}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CollapsibleSection>
+              </>
+            )}
+
+            {/* Instagram */}
+            {data.instagram_data && (
+              <>
+                <Separator />
+                <CollapsibleSection title="Instagram" icon={Instagram} iconColor="text-pink-500" defaultOpen={false}>
+                  <div className="space-y-3">
+                    {data.instagram_data.username && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">@{data.instagram_data.username}</span>
+                        {data.instagram_data.is_business && (
+                          <Badge className="bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400 border-0 text-xs">
+                            Conta Business
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                    {data.instagram_data.full_name && (
+                      <p className="text-sm text-muted-foreground">{data.instagram_data.full_name}</p>
+                    )}
+                    {data.instagram_data.bio && (
+                      <p className="text-sm">{data.instagram_data.bio}</p>
+                    )}
+
+                    {/* Stats */}
+                    <div className="grid grid-cols-3 gap-3">
+                      {data.instagram_data.followers !== undefined && (
+                        <div className="rounded-lg border bg-muted/30 px-3 py-2 text-center">
+                          <p className="text-lg font-bold">{data.instagram_data.followers.toLocaleString('pt-BR')}</p>
+                          <p className="text-xs text-muted-foreground">Seguidores</p>
+                        </div>
+                      )}
+                      {data.instagram_data.following !== undefined && (
+                        <div className="rounded-lg border bg-muted/30 px-3 py-2 text-center">
+                          <p className="text-lg font-bold">{data.instagram_data.following.toLocaleString('pt-BR')}</p>
+                          <p className="text-xs text-muted-foreground">Seguindo</p>
+                        </div>
+                      )}
+                      {data.instagram_data.posts_count !== undefined && (
+                        <div className="rounded-lg border bg-muted/30 px-3 py-2 text-center">
+                          <p className="text-lg font-bold">{data.instagram_data.posts_count.toLocaleString('pt-BR')}</p>
+                          <p className="text-xs text-muted-foreground">Posts</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {data.instagram_data.external_url && (
+                      <a
+                        href={data.instagram_data.external_url.startsWith('http') ? data.instagram_data.external_url : `https://${data.instagram_data.external_url}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        {data.instagram_data.external_url}
+                      </a>
+                    )}
+                  </div>
+                </CollapsibleSection>
+              </>
+            )}
+
+            {/* Anuncios Ativos (Meta) */}
+            {data.meta_ads_data && (data.meta_ads_data.total_active_ads ?? 0) > 0 && (
+              <>
+                <Separator />
+                <CollapsibleSection title="Anuncios Ativos (Meta)" icon={Megaphone} iconColor="text-blue-500" count={data.meta_ads_data.total_active_ads} defaultOpen={false}>
+                  <div className="space-y-3">
+                    {/* Plataformas */}
+                    {data.meta_ads_data.plataformas && data.meta_ads_data.plataformas.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {data.meta_ads_data.plataformas.map((plat, index) => (
+                          <Badge key={index} variant="secondary" className="text-xs">
+                            {plat}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Tipos criativos */}
+                    {data.meta_ads_data.tipos_criativos && data.meta_ads_data.tipos_criativos.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {data.meta_ads_data.tipos_criativos.map((tipo, index) => (
+                          <Badge key={index} variant="outline" className="text-xs">
+                            {tipo}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Ads list (first 5) */}
+                    {data.meta_ads_data.ads && data.meta_ads_data.ads.length > 0 && (
+                      <div className="space-y-2">
+                        {data.meta_ads_data.ads.slice(0, 5).map((ad, index) => (
+                          <div key={index} className="rounded-lg border bg-muted/30 px-3 py-2">
+                            {ad.ad_creative_link_title && (
+                              <p className="text-sm font-medium">{ad.ad_creative_link_title}</p>
+                            )}
+                            {ad.ad_creative_body && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {ad.ad_creative_body.length > 100
+                                  ? `${ad.ad_creative_body.slice(0, 100)}...`
+                                  : ad.ad_creative_body}
+                              </p>
+                            )}
+                            {ad.page_name && (
+                              <p className="text-xs text-muted-foreground mt-1 italic">
+                                via {ad.page_name}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                        {data.meta_ads_data.ads.length > 5 && (
+                          <p className="text-xs text-muted-foreground">
+                            +{data.meta_ads_data.ads.length - 5} anuncios adicionais
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </CollapsibleSection>
+              </>
             )}
 
             {/* Enrichment timestamp */}
