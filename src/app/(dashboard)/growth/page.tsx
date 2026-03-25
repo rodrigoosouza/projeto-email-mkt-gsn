@@ -28,11 +28,12 @@ function fmtP(v: number) { return `${v.toFixed(2)}%` }
 type DateFilter = 'today' | 'yesterday' | '7d' | '30d' | 'this_month' | 'last_month' | 'all'
 function getRange(f: DateFilter) {
   const now = new Date(); const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const endOfToday = new Date(today.getTime() + 24 * 60 * 60 * 1000 - 1)
   switch (f) {
-    case 'today': return { from: today, to: now }
-    case 'yesterday': return { from: subDays(today, 1), to: today }
-    case '7d': return { from: subDays(today, 6), to: now }
-    case '30d': return { from: subDays(today, 29), to: now }
+    case 'today': return { from: today, to: endOfToday }
+    case 'yesterday': return { from: subDays(today, 1), to: new Date(today.getTime() - 1) }
+    case '7d': return { from: subDays(today, 6), to: endOfToday }
+    case '30d': return { from: subDays(today, 29), to: endOfToday }
     case 'this_month': return { from: startOfMonth(today), to: endOfMonth(today) }
     case 'last_month': { const lm = new Date(today.getFullYear(), today.getMonth()-1, 1); return { from: startOfMonth(lm), to: endOfMonth(lm) } }
     case 'all': return null
@@ -120,13 +121,13 @@ export default function GrowthAnalysisPage() {
     try {
       const sb = createClient()
       const [c, ai, asi, am, asm, d, s] = await Promise.all([
-        sb.from('meta_campaign_insights').select('*').eq('org_id', orgId).order('date', { ascending: false }).range(0, 999),
-        sb.from('meta_ad_insights').select('*').eq('org_id', orgId).range(0, 999),
-        sb.from('meta_adset_insights').select('*').eq('org_id', orgId).range(0, 999),
-        sb.from('meta_ads').select('*').eq('org_id', orgId).range(0, 999),
-        sb.from('meta_adsets').select('*').eq('org_id', orgId).range(0, 999),
-        sb.from('pipedrive_deals').select('*').eq('org_id', orgId).order('add_time', { ascending: false }).range(0, 999),
-        sb.from('pipedrive_stages').select('*').eq('org_id', orgId).order('order_nr', { ascending: true }),
+        sb.from('meta_campaign_insights').select('id,campaign_id,campaign_name,date,impressions,reach,clicks,link_clicks,spend,cpc,cpm,ctr,leads,cost_per_lead,frequency').eq('org_id', orgId).order('date', { ascending: false }).range(0, 999),
+        sb.from('meta_ad_insights').select('id,ad_id,ad_name,adset_id,campaign_id,date,impressions,clicks,spend,leads,reach,ctr,cpc,cpm,link_clicks').eq('org_id', orgId).range(0, 999),
+        sb.from('meta_adset_insights').select('id,adset_id,adset_name,campaign_id,date,impressions,clicks,spend,leads,reach').eq('org_id', orgId).range(0, 999),
+        sb.from('meta_ads').select('id,ad_id,name,adset_id,campaign_id,status,image_url,thumbnail_url').eq('org_id', orgId).range(0, 999),
+        sb.from('meta_adsets').select('id,adset_id,name,campaign_id,status,targeting').eq('org_id', orgId).range(0, 999),
+        sb.from('pipedrive_deals').select('deal_id,title,value,currency,status,stage_id,stage_name,pipeline_name,person_name,person_email,org_name,owner_name,add_time,update_time,won_time,lost_time,lost_reason,utm_source,utm_medium,utm_campaign,utm_content,utm_term').eq('org_id', orgId).order('add_time', { ascending: false }).range(0, 999),
+        sb.from('pipedrive_stages').select('stage_id,name,order_nr,pipeline_name').eq('org_id', orgId).order('order_nr', { ascending: true }),
       ])
       if (c.error) console.error('campaign_insights error:', c.error)
       if (ai.error) console.error('ad_insights error:', ai.error)
