@@ -182,7 +182,6 @@ export default function PipedriveDashboardPage() {
       ])
 
       if (dealsRes.error) throw dealsRes.error
-      console.log(`[CRM] Loaded ${dealsRes.data?.length || 0} deals for org ${orgId}`)
       setDeals(dealsRes.data || [])
       // Get pipeline name from first deal or stage
       const name = dealsRes.data?.[0]?.pipeline_name || stagesRes.data?.[0]?.pipeline_name
@@ -254,7 +253,6 @@ export default function PipedriveDashboardPage() {
       filtered = filtered.filter((d) => String(d.stage_id) === stageFilter)
     }
 
-    console.log(`[CRM] Filter: ${dateFilter}, Input: ${deals.length}, Output: ${filtered.length}`, range ? { from: range.from.toISOString(), to: range.to.toISOString() } : 'ALL')
     return filtered
   }, [deals, dateFilter, statusFilter, stageFilter])
 
@@ -313,7 +311,7 @@ export default function PipedriveDashboardPage() {
       })
 
     return Array.from(stageMap.values())
-      .filter((s) => s.count > 0 || stages.some((st) => st.stage_id))
+      .filter((s) => s.count > 0)
       .sort((a, b) => a.order - b.order)
   }, [filteredDeals, stages])
 
@@ -372,7 +370,9 @@ export default function PipedriveDashboardPage() {
         <div>
           <h2 className="text-2xl font-bold tracking-tight">CRM Funil — {pipelineName}</h2>
           <p className="text-sm text-muted-foreground">
-            {currentOrg?.name} — Pipeline {pipelineName} — {formatNumber(deals.length)} deals
+            {currentOrg?.name} — Pipeline {pipelineName} — {dateFilter !== 'all'
+              ? `${formatNumber(filteredDeals.length)} deals no periodo (de ${formatNumber(deals.length)} total)`
+              : `${formatNumber(deals.length)} deals`}
           </p>
         </div>
         <Button size="sm" variant="outline" onClick={handleSync} disabled={syncing}>
