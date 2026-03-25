@@ -124,18 +124,19 @@ type DateFilter = 'today' | 'yesterday' | '7d' | '30d' | 'this_month' | 'last_mo
 function getDateRange(filter: DateFilter): { from: Date; to: Date } | null {
   const now = new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const endOfToday = new Date(today.getTime() + 24 * 60 * 60 * 1000 - 1) // 23:59:59.999
 
   switch (filter) {
     case 'today':
-      return { from: today, to: now }
+      return { from: today, to: endOfToday }
     case 'yesterday': {
       const yesterday = subDays(today, 1)
-      return { from: yesterday, to: today }
+      return { from: yesterday, to: new Date(today.getTime() - 1) } // yesterday 23:59:59.999
     }
     case '7d':
-      return { from: subDays(today, 6), to: now }
+      return { from: subDays(today, 6), to: endOfToday }
     case '30d':
-      return { from: subDays(today, 29), to: now }
+      return { from: subDays(today, 29), to: endOfToday }
     case 'this_month':
       return { from: startOfMonth(today), to: endOfMonth(today) }
     case 'last_month': {
@@ -170,7 +171,7 @@ export default function PipedriveDashboardPage() {
       const [dealsRes, stagesRes] = await Promise.all([
         supabase
           .from('pipedrive_deals')
-          .select('*')
+          .select('deal_id,title,value,currency,status,stage_id,stage_name,pipeline_name,person_name,person_email,person_phone,org_name,owner_name,add_time,update_time,won_time,lost_time,lost_reason,expected_close_date,label,utm_source,utm_medium,utm_campaign,utm_content,utm_term')
           .eq('org_id', orgId)
           .order('update_time', { ascending: false }),
         supabase
@@ -181,6 +182,7 @@ export default function PipedriveDashboardPage() {
       ])
 
       if (dealsRes.error) throw dealsRes.error
+      console.log(`[CRM] Loaded ${dealsRes.data?.length || 0} deals for org ${orgId}`)
       setDeals(dealsRes.data || [])
       // Get pipeline name from first deal or stage
       const name = dealsRes.data?.[0]?.pipeline_name || stagesRes.data?.[0]?.pipeline_name
@@ -252,6 +254,7 @@ export default function PipedriveDashboardPage() {
       filtered = filtered.filter((d) => String(d.stage_id) === stageFilter)
     }
 
+    console.log(`[CRM] Filter: ${dateFilter}, Input: ${deals.length}, Output: ${filtered.length}`, range ? { from: range.from.toISOString(), to: range.to.toISOString() } : 'ALL')
     return filtered
   }, [deals, dateFilter, statusFilter, stageFilter])
 

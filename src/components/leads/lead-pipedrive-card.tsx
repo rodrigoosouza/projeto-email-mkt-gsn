@@ -208,7 +208,7 @@ export function LeadPipedriveCard({ leadEmail, leadName, orgId }: LeadPipedriveC
         // 1. Find matching deal by email
         const { data: deals } = await supabase
           .from('pipedrive_deals')
-          .select('*')
+          .select('deal_id,title,value,currency,status,stage_name,pipeline_name,person_name,person_email,person_phone,org_name,owner_name,add_time,update_time,close_time,won_time,lost_time,lost_reason,expected_close_date,probability,label,utm_source,utm_medium,utm_campaign,utm_content,utm_term')
           .eq('org_id', orgId)
           .eq('person_email', leadEmail)
           .order('add_time', { ascending: false })
@@ -218,7 +218,7 @@ export function LeadPipedriveCard({ leadEmail, leadName, orgId }: LeadPipedriveC
           // Try by name
           const { data: dealsByName } = await supabase
             .from('pipedrive_deals')
-            .select('*')
+            .select('deal_id,title,value,currency,status,stage_name,pipeline_name,person_name,person_email,person_phone,org_name,owner_name,add_time,update_time,close_time,won_time,lost_time,lost_reason,expected_close_date,probability,label,utm_source,utm_medium,utm_campaign,utm_content,utm_term')
             .eq('org_id', orgId)
             .ilike('person_name', `%${leadName}%`)
             .order('add_time', { ascending: false })

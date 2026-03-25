@@ -235,7 +235,7 @@ export default function AdsDashboardPage() {
       const supabase = createClient()
       const { data, error } = await supabase
         .from('meta_campaign_insights')
-        .select('*')
+        .select('id,campaign_id,campaign_name,date,impressions,reach,clicks,link_clicks,spend,cpc,cpm,ctr,leads,cost_per_lead,frequency')
         .eq('org_id', orgId)
         .order('date', { ascending: false })
 
