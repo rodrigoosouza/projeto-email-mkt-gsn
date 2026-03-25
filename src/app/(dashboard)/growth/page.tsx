@@ -195,6 +195,21 @@ export default function GrowthAnalysisPage() {
   const fAds = useMemo(() => filterDate(adInsights, rangeFrom, rangeTo), [adInsights, rangeFrom, rangeTo])
   const fAdsets = useMemo(() => filterDate(adsetInsights, rangeFrom, rangeTo), [adsetInsights, rangeFrom, rangeTo])
   const fDeals = useMemo(() => filterDate(deals, rangeFrom, rangeTo), [deals, rangeFrom, rangeTo])
+  // Deals won filtered by won_time (not add_time) — a deal created in Feb but won yesterday should show
+  const fWonDeals = useMemo(() => {
+    if (!rangeFrom || !rangeTo) return deals.filter((d: any) => d.status === 'won')
+    const fromTime = rangeFrom.getTime()
+    const toTime = rangeTo.getTime()
+    return deals.filter((d: any) => {
+      if (d.status !== 'won') return false
+      const wt = d.won_time
+      if (!wt) return false
+      try {
+        const t = new Date(wt).getTime()
+        return t >= fromTime && t <= toTime
+      } catch { return false }
+    })
+  }, [deals, rangeFrom, rangeTo])
 
   const adMetaMap = useMemo(() => { const m = new Map(); adsMeta.forEach(a => m.set(a.ad_id, a)); return m }, [adsMeta])
   const adsetMetaMap = useMemo(() => { const m = new Map(); adsetsMeta.forEach(a => m.set(a.adset_id, a)); return m }, [adsetsMeta])
@@ -215,11 +230,12 @@ export default function GrowthAnalysisPage() {
   }, [fCampaigns])
 
   const sales = useMemo(() => {
-    const open = fDeals.filter(d=>d.status==='open'), won = fDeals.filter(d=>d.status==='won'), lost = fDeals.filter(d=>d.status==='lost')
-    return { total: fDeals.length, open: open.length, won: won.length, lost: lost.length,
-      wonValue: won.reduce((s,d)=>s+Number(d.value||0),0), openValue: open.reduce((s,d)=>s+Number(d.value||0),0),
-      winRate: (won.length+lost.length)>0?(won.length/(won.length+lost.length))*100:0 }
-  }, [fDeals])
+    const open = fDeals.filter(d=>d.status==='open'), lost = fDeals.filter(d=>d.status==='lost')
+    // Won comes from fWonDeals (filtered by won_time, not add_time)
+    return { total: fDeals.length, open: open.length, won: fWonDeals.length, lost: lost.length,
+      wonValue: fWonDeals.reduce((s,d)=>s+Number(d.value||0),0), openValue: open.reduce((s,d)=>s+Number(d.value||0),0),
+      winRate: (fWonDeals.length+lost.length)>0?(fWonDeals.length/(fWonDeals.length+lost.length))*100:0 }
+  }, [fDeals, fWonDeals])
 
   const roas = mkt.spend>0 ? sales.wonValue/mkt.spend : 0
 
@@ -254,7 +270,7 @@ export default function GrowthAnalysisPage() {
 
   // === CRIATIVOS NO CRM ===
   const wonDealsAll = useMemo(() => {
-    return deals.filter((d: any) => d.status === 'won').map((d: any) => {
+    return fWonDeals.map((d: any) => {
       let source = 'Direto / Sem rastreio'
       if (d.utm_source === 'facebook') source = 'Meta Ads'
       else if (d.utm_source === 'google') source = 'Google Ads'
@@ -263,7 +279,7 @@ export default function GrowthAnalysisPage() {
       else if (d.utm_source) source = d.utm_source
       return { title: d.title, personName: d.person_name, value: Number(d.value || 0), wonTime: d.won_time, utmTerm: d.utm_term, utmContent: d.utm_content, utmSource: d.utm_source, source }
     }).sort((a: any, b: any) => (b.wonTime || '').localeCompare(a.wonTime || ''))
-  }, [deals])
+  }, [fWonDeals])
 
   const creativesInCRM = useMemo(() => {
     const map = new Map()
