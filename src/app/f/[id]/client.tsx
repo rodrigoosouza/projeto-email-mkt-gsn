@@ -49,15 +49,103 @@ function hexToHsl(hex: string): { h: number; s: number; l: number } | null {
   return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) }
 }
 
+// --- Tracking helpers ---
+function getParam(params: URLSearchParams, name: string): string {
+  return params.get(name) || ''
+}
+
+function getCookie(name: string): string {
+  if (typeof document === 'undefined') return ''
+  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'))
+  return match ? decodeURIComponent(match[2]) : ''
+}
+
+function generateSessionId(): string {
+  return `${Date.now()}.${Math.random().toString(36).substring(2, 10)}`
+}
+
+function captureTrackingData(): Record<string, string> {
+  if (typeof window === 'undefined') return {}
+
+  const params = new URLSearchParams(window.location.search)
+  const tracking: Record<string, string> = {}
+
+  // URL params
+  const urlParamKeys = [
+    'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term',
+    'gclid', 'gbraid', 'wbraid', 'gad_campaignid', 'gad_source',
+    'fbclid', 'ttclid', 'msclkid', 'li_fat_id', 'twclid', 'sck', 'ref',
+  ]
+  for (const key of urlParamKeys) {
+    const val = getParam(params, key)
+    if (val) tracking[key] = val
+  }
+
+  // Cookies: fbc and fbp
+  const fbcCookie = getCookie('_fbc')
+  const fbpCookie = getCookie('_fbp')
+  if (fbcCookie) {
+    tracking.fbc = fbcCookie
+  } else if (tracking.fbclid) {
+    tracking.fbc = `fb.1.${Date.now()}.${tracking.fbclid}`
+  }
+  if (fbpCookie) tracking.fbp = fbpCookie
+
+  // JavaScript-derived fields
+  tracking.landing_page = window.location.href
+  tracking.referrer = document.referrer || ''
+  tracking.user_agent = navigator.userAgent || ''
+  tracking.first_visit = new Date().toISOString()
+  tracking.session_id = generateSessionId()
+  tracking.originPage = window.location.href
+
+  // session_attributes_encoded: base64 of UTM + click ID params
+  const sessionAttrs: Record<string, string> = {}
+  const encodeKeys = [
+    'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term',
+    'gclid', 'gbraid', 'wbraid', 'gad_campaignid', 'gad_source',
+    'fbclid', 'fbc', 'fbp', 'ttclid', 'msclkid', 'li_fat_id', 'twclid', 'sck', 'ref',
+  ]
+  for (const key of encodeKeys) {
+    if (tracking[key]) sessionAttrs[key] = tracking[key]
+  }
+  if (Object.keys(sessionAttrs).length > 0) {
+    tracking.session_attributes_encoded = btoa(JSON.stringify(sessionAttrs))
+  }
+
+  return tracking
+}
+
 export function PublicFormClient({ form }: { form: FormData }) {
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState('')
   const [values, setValues] = useState<Record<string, string>>({})
   const [mounted, setMounted] = useState(false)
+  const [trackingData, setTrackingData] = useState<Record<string, string>>({})
 
   useEffect(() => {
     setMounted(true)
+
+    if (typeof window === 'undefined') return
+
+    const storageKey = '__wl_tracking'
+    const stored = sessionStorage.getItem(storageKey)
+
+    let tracking: Record<string, string>
+
+    if (stored) {
+      // Session already has tracking — preserve it, just update current page
+      tracking = JSON.parse(stored)
+      tracking.landing_page = window.location.href
+      tracking.originPage = window.location.href
+    } else {
+      // First visit in session — capture everything from URL params
+      tracking = captureTrackingData()
+    }
+
+    sessionStorage.setItem(storageKey, JSON.stringify(tracking))
+    setTrackingData(tracking)
   }, [])
 
   const style = form.style || {}
@@ -79,14 +167,26 @@ export function PublicFormClient({ form }: { form: FormData }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          fields: values,
+          data: values,
           source_url: window.location.href,
+          tracking: trackingData,
         }),
       })
 
       if (!res.ok) {
         const data = await res.json().catch(() => null)
         throw new Error(data?.error || 'Erro ao enviar')
+      }
+
+      // Push to dataLayer for GTM
+      if (typeof window !== 'undefined' && (window as any).dataLayer) {
+        (window as any).dataLayer.push({
+          event: 'form_submit_lead',
+          ...trackingData,
+          lead_name: values.nome || values.first_name || values.name || '',
+          lead_email: values.email || '',
+          lead_whatsapp: values.whatsapp || values.telefone || values.phone || '',
+        })
       }
 
       setSubmitted(true)

@@ -35,8 +35,9 @@ export async function POST(
     }
 
     const body = await request.json()
-    const formData = body.data || {}
+    const formData = body.data || body.fields || {}
     const sourceUrl = body.source_url || null
+    const tracking: Record<string, string> = body.tracking || {}
 
     // Validate required fields
     const fields = form.fields as any[]
@@ -75,6 +76,24 @@ export async function POST(
       if (formData.position || formData.cargo) {
         leadPayload.position = formData.position || formData.cargo
       }
+
+      // Build tracking custom fields (only non-empty values)
+      const trackingFields: Record<string, string> = {}
+      for (const [key, val] of Object.entries(tracking)) {
+        if (val) trackingFields[key] = val
+      }
+
+      // First, try to get existing lead to preserve custom_fields
+      const { data: existingLead } = await supabase
+        .from('leads')
+        .select('custom_fields')
+        .eq('org_id', form.org_id)
+        .eq('email', email)
+        .single()
+
+      const existingCustomFields = (existingLead?.custom_fields as Record<string, any>) || {}
+      // Merge: existing values take precedence, then add new tracking fields
+      leadPayload.custom_fields = { ...trackingFields, ...existingCustomFields }
 
       const { data: lead, error: leadError } = await supabase
         .from('leads')
@@ -138,12 +157,16 @@ export async function POST(
       null
     const userAgent = request.headers.get('user-agent') || null
 
-    // Save form submission
+    // Save form submission (include tracking data alongside form data)
+    const submissionData = {
+      ...formData,
+      ...(Object.keys(tracking).length > 0 ? { _tracking: tracking } : {}),
+    }
     await supabase.from('form_submissions').insert({
       form_id: formId,
       org_id: form.org_id,
       lead_id: leadId,
-      data: formData,
+      data: submissionData,
       source_url: sourceUrl,
       ip_address: ipAddress,
       user_agent: userAgent,
