@@ -126,16 +126,22 @@ async function callOpenRouter(messages: AIMessage[], maxTokens: number, temperat
       temperature,
       messages: messages.map((m) => ({ role: m.role, content: m.content })),
     }),
+    signal: AbortSignal.timeout(90000),
   })
 
   if (!response.ok) {
     const err = await response.text()
-    console.error('OpenRouter API error:', err)
+    console.error('OpenRouter API error:', response.status, err.slice(0, 500))
     throw new Error(`OpenRouter API error: ${response.status}`)
   }
 
   const data = await response.json()
-  return data.choices?.[0]?.message?.content || ''
+  const content = data.choices?.[0]?.message?.content
+  if (!content) {
+    console.error('OpenRouter empty response:', JSON.stringify(data).slice(0, 500))
+    throw new Error('OpenRouter returned empty response')
+  }
+  return content
 }
 
 /**

@@ -18,14 +18,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'orgId, messages, fromDate, toDate required' }, { status: 400 })
     }
 
-    // Aggregate all data for the period
-    const snapshot = await aggregateGrowthData(orgId, fromDate, toDate)
+    // Aggregate all data for the period (with error handling)
+    let snapshot
+    try {
+      snapshot = await aggregateGrowthData(orgId, fromDate, toDate)
+    } catch (aggError) {
+      console.error('Growth data aggregation error:', aggError)
+      return NextResponse.json({ error: 'Erro ao carregar dados. Tente um periodo menor.' }, { status: 500 })
+    }
 
-    // Build context
+    // Build context (limit size to avoid token overflow)
     const dataContext = buildDataContext(snapshot)
+    const truncatedContext = dataContext.length > 15000 ? dataContext.slice(0, 15000) + '\n\n[... dados truncados por limite de tamanho]' : dataContext
 
     // Build messages for AI
-    const systemMessage = GROWTH_SYSTEM_PROMPT + '\n\n' + dataContext
+    const systemMessage = GROWTH_SYSTEM_PROMPT + '\n\n' + truncatedContext
 
     const aiMessages = messages.map((m: any) => ({
       role: m.role,
