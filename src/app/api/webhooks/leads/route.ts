@@ -45,7 +45,9 @@ function mapLeadData(body: Record<string, any>): {
   if (body.score !== undefined) lead.score = Math.min(100, Math.max(0, Number(body.score) || 0))
 
   // === External ID ===
-  lead.external_id = body.external_id || body.id || body.pipedrive_deal_id || null
+  lead.external_id = body.external_id || body.pipedrive_deal_id || null
+  // body.id is the external system's UUID — save in custom_fields, not as external_id
+  if (body.id && !body.external_id) customFields.external_system_id = body.id
 
   // === Tags ===
   if (body.tags && Array.isArray(body.tags)) tags.push(...body.tags)
