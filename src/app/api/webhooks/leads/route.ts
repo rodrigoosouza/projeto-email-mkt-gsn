@@ -134,13 +134,28 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        // Fetch existing custom_fields to merge (don't overwrite)
+        // Fetch existing lead to detect create vs update + track changes
         const { data: existingLead } = await supabase
           .from('leads')
-          .select('custom_fields')
+          .select('id, first_name, last_name, phone, company, position, source, score, custom_fields')
           .eq('org_id', orgId)
           .eq('email', lead.email)
           .single()
+
+        const isUpdate = !!existingLead
+        const changedFields: { field: string; from: any; to: any }[] = []
+
+        if (isUpdate) {
+          // Track what changed
+          const fieldsToTrack = ['first_name', 'last_name', 'phone', 'company', 'position', 'source'] as const
+          for (const field of fieldsToTrack) {
+            const oldVal = existingLead[field]
+            const newVal = lead[field]
+            if (newVal && newVal !== oldVal) {
+              changedFields.push({ field, from: oldVal || null, to: newVal })
+            }
+          }
+        }
 
         const mergedCustomFields = {
           ...(existingLead?.custom_fields as Record<string, any> || {}),
@@ -200,15 +215,60 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Log event
-        await supabase.from('lead_events').insert({
-          org_id: orgId,
-          lead_id: savedLead.id,
-          event_type: 'custom',
-          title: 'Lead recebido via webhook',
-          description: `Fonte: ${lead.source}${lead.company ? ' — ' + lead.company : ''}`,
-          metadata: { source: lead.source, utm_source: customFields.utm_source, utm_campaign: customFields.utm_campaign },
-        })
+        // Log event — different for create vs update
+        if (isUpdate && changedFields.length > 0) {
+          const changedSummary = changedFields.map(c => `${c.field}: "${c.from || '-'}" → "${c.to}"`).join(', ')
+          await supabase.from('lead_events').insert({
+            org_id: orgId,
+            lead_id: savedLead.id,
+            event_type: 'custom',
+            title: 'Lead atualizado via webhook',
+            description: `Campos alterados: ${changedSummary}`,
+            metadata: {
+              action: 'update',
+              source: lead.source,
+              changed_fields: changedFields,
+              utm_source: customFields.utm_source,
+              utm_campaign: customFields.utm_campaign,
+              webhook_source: 'api',
+            },
+          })
+        } else if (isUpdate) {
+          // Updated but no core fields changed (only custom_fields/tracking)
+          await supabase.from('lead_events').insert({
+            org_id: orgId,
+            lead_id: savedLead.id,
+            event_type: 'custom',
+            title: 'Lead reprocessado via webhook',
+            description: `Dados de tracking atualizados. Fonte: ${lead.source}`,
+            metadata: {
+              action: 'reprocess',
+              source: lead.source,
+              utm_source: customFields.utm_source,
+              utm_campaign: customFields.utm_campaign,
+              webhook_source: 'api',
+            },
+          })
+        } else {
+          // New lead created
+          await supabase.from('lead_events').insert({
+            org_id: orgId,
+            lead_id: savedLead.id,
+            event_type: 'custom',
+            title: 'Lead criado via webhook',
+            description: `Novo lead: ${lead.first_name || ''} ${lead.last_name || ''} — ${lead.company || lead.source || 'API'}`,
+            metadata: {
+              action: 'create',
+              source: lead.source,
+              utm_source: customFields.utm_source,
+              utm_medium: customFields.utm_medium,
+              utm_campaign: customFields.utm_campaign,
+              utm_content: customFields.utm_content,
+              utm_term: customFields.utm_term,
+              webhook_source: 'api',
+            },
+          })
+        }
 
         results.push({ email: lead.email, success: true })
       } catch (itemError: any) {

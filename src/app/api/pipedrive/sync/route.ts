@@ -190,6 +190,30 @@ async function syncPipedrive(
               console.warn('[Pipedrive Sync] Lead creation error (non-fatal):', insertError.message)
             } else {
               console.log(`[Pipedrive Sync] Created ${newLeads.length} new leads from Pipedrive deals`)
+
+              // Log events for newly created leads
+              try {
+                const { data: createdLeads } = await admin
+                  .from('leads')
+                  .select('id, email, first_name, company, source')
+                  .eq('org_id', orgId)
+                  .in('email', newLeads.map(l => l.email).filter(Boolean))
+
+                if (createdLeads && createdLeads.length > 0) {
+                  const events = createdLeads.map(l => ({
+                    org_id: orgId,
+                    lead_id: l.id,
+                    event_type: 'custom',
+                    title: 'Lead criado via Pipedrive Sync',
+                    description: `${l.first_name || ''} — ${l.company || l.source || 'Pipedrive'}`,
+                    metadata: { action: 'create', source: l.source, webhook_source: 'pipedrive_sync' },
+                  }))
+                  // Batch insert events (max 100 to avoid payload limits)
+                  for (let e = 0; e < events.length; e += 100) {
+                    await admin.from('lead_events').insert(events.slice(e, e + 100))
+                  }
+                }
+              } catch { /* non-fatal */ }
             }
           }
         }
