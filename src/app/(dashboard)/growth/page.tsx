@@ -195,9 +195,9 @@ export default function GrowthAnalysisPage() {
   const fAds = useMemo(() => filterDate(adInsights, rangeFrom, rangeTo), [adInsights, rangeFrom, rangeTo])
   const fAdsets = useMemo(() => filterDate(adsetInsights, rangeFrom, rangeTo), [adsetInsights, rangeFrom, rangeTo])
   const fDeals = useMemo(() => filterDate(deals, rangeFrom, rangeTo), [deals, rangeFrom, rangeTo])
-  // Deals won filtered by won_time (not add_time) — a deal created in Feb but won yesterday should show
+  // Deals won filtered by won_time (not add_time) — only 2026+
   const fWonDeals = useMemo(() => {
-    if (!rangeFrom || !rangeTo) return deals.filter((d: any) => d.status === 'won')
+    if (!rangeFrom || !rangeTo) return deals.filter((d: any) => d.status === 'won' && d.won_time && d.won_time >= '2026-01-01')
     const fromTime = rangeFrom.getTime()
     const toTime = rangeTo.getTime()
     return deals.filter((d: any) => {
@@ -269,26 +269,28 @@ export default function GrowthAnalysisPage() {
   }, [fAdsets, adsetMetaMap])
 
   // === VENDAS POR CRIATIVO (utm_term) — para cruzar com Meta Ads ===
+  const wonDeals2026 = useMemo(() => deals.filter((d: any) => d.status === 'won' && d.won_time && d.won_time >= '2026-01-01'), [deals])
+
   const wonByCreative = useMemo(() => {
     const map = new Map<string, { won: number; value: number }>()
-    deals.filter((d: any) => d.status === 'won' && d.utm_term).forEach((d: any) => {
+    wonDeals2026.filter((d: any) => d.utm_term).forEach((d: any) => {
       const e = map.get(d.utm_term) || { won: 0, value: 0 }
       e.won++; e.value += Number(d.value || 0)
       map.set(d.utm_term, e)
     })
     return map
-  }, [deals])
+  }, [wonDeals2026])
 
   // === VENDAS POR PUBLICO (utm_content) — para cruzar com Meta Ads ===
   const wonByAudience = useMemo(() => {
     const map = new Map<string, { won: number; value: number }>()
-    deals.filter((d: any) => d.status === 'won' && d.utm_content).forEach((d: any) => {
+    wonDeals2026.filter((d: any) => d.utm_content).forEach((d: any) => {
       const e = map.get(d.utm_content) || { won: 0, value: 0 }
       e.won++; e.value += Number(d.value || 0)
       map.set(d.utm_content, e)
     })
     return map
-  }, [deals])
+  }, [wonDeals2026])
 
   // === CAMPANHAS META ADS COM VENDAS ===
   const campaignStats = useMemo(() => {
