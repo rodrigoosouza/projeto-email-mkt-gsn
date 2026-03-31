@@ -2,11 +2,11 @@
   "crons": [
     {
       "path": "/api/meta-ads/sync",
-      "schedule": "0 */6 * * *"
+      "schedule": "0 6 * * *"
     },
     {
       "path": "/api/pipedrive/sync",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 7 * * *"
     }
   ]
 }

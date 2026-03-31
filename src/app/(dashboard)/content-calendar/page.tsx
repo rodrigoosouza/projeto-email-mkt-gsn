@@ -12,6 +12,8 @@ import {
   Calendar,
   ImageIcon,
   RefreshCw,
+  Instagram,
+  Check,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -24,6 +26,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -77,6 +80,9 @@ export default function ContentCalendarPage() {
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [editingPost, setEditingPost] = useState<ContentPost | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [deleting, setDeleting] = useState(false)
+  const [publishingIG, setPublishingIG] = useState<string | null>(null)
   const [generatingImage, setGeneratingImage] = useState<string | null>(null)
   const [imageFormatChoice, setImageFormatChoice] = useState<'1:1' | '9:16' | '16:9'>('1:1')
   const [carouselCardCount, setCarouselCardCount] = useState(5)
@@ -151,6 +157,71 @@ export default function ContentCalendarPage() {
       fetchPosts()
     } catch {
       toast({ title: 'Erro ao remover post', variant: 'destructive' })
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === posts.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(posts.map(p => p.id)))
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+    setDeleting(true)
+    try {
+      let deleted = 0
+      for (const id of Array.from(selectedIds)) {
+        try {
+          await deleteContentPost(id)
+          deleted++
+        } catch { /* continue */ }
+      }
+      toast({ title: `${deleted} post(s) removido(s)` })
+      setSelectedIds(new Set())
+      fetchPosts()
+    } catch {
+      toast({ title: 'Erro ao remover posts', variant: 'destructive' })
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const handlePublishInstagram = async (postId: string) => {
+    if (!currentOrg) return
+    setPublishingIG(postId)
+    try {
+      const res = await fetch('/api/instagram/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postId, orgId: currentOrg.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Erro ao publicar')
+      toast({
+        title: 'Publicado no Instagram!',
+        description: data.permalink ? `Ver post: ${data.permalink}` : 'Post publicado com sucesso.',
+      })
+      fetchPosts()
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao publicar no Instagram',
+        description: error.message || 'Verifique se a conta Instagram esta conectada.',
+        variant: 'destructive',
+      })
+    } finally {
+      setPublishingIG(null)
     }
   }
 
@@ -294,8 +365,19 @@ export default function ContentCalendarPage() {
       {/* Post List (below calendar) */}
       {posts.length > 0 && (
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-base">Posts do Mes ({posts.length})</CardTitle>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" className="text-xs h-7" onClick={toggleSelectAll}>
+                {selectedIds.size === posts.length ? 'Desmarcar todos' : 'Selecionar todos'}
+              </Button>
+              {selectedIds.size > 0 && (
+                <Button variant="destructive" size="sm" className="text-xs h-7" onClick={handleBulkDelete} disabled={deleting}>
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  {deleting ? 'Removendo...' : `Excluir ${selectedIds.size} selecionado(s)`}
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
@@ -304,9 +386,15 @@ export default function ContentCalendarPage() {
                 return (
                   <div
                     key={post.id}
-                    className="flex items-center gap-3 p-2 rounded-md hover:bg-muted/50 cursor-pointer"
+                    className={`flex items-center gap-3 p-2 rounded-md hover:bg-muted/50 cursor-pointer ${selectedIds.has(post.id) ? 'bg-primary/5 ring-1 ring-primary/20' : ''}`}
                     onClick={() => setEditingPost(post)}
                   >
+                    <Checkbox
+                      checked={selectedIds.has(post.id)}
+                      onCheckedChange={() => toggleSelect(post.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="shrink-0"
+                    />
                     <div
                       className="w-3 h-3 rounded-full shrink-0"
                       style={{ backgroundColor: pillarConfig?.color || '#6b7280' }}
@@ -333,6 +421,22 @@ export default function ContentCalendarPage() {
                         <SelectItem value="published">Publicado</SelectItem>
                       </SelectContent>
                     </Select>
+                    {(post as any).published_to_instagram ? (
+                      <Badge variant="secondary" className="text-[10px] h-6 bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400 border-0 shrink-0">
+                        <Check className="h-2.5 w-2.5 mr-0.5" /> IG
+                      </Badge>
+                    ) : (post as any).image_urls?.length > 0 ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0 h-7 w-7 text-pink-600 hover:text-pink-700 hover:bg-pink-50"
+                        onClick={(e) => { e.stopPropagation(); handlePublishInstagram(post.id) }}
+                        disabled={publishingIG === post.id}
+                        title="Publicar no Instagram"
+                      >
+                        {publishingIG === post.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Instagram className="h-3.5 w-3.5" />}
+                      </Button>
+                    ) : null}
                     <Button
                       variant="ghost"
                       size="icon"

@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { Menu, LogOut, User as UserIcon } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -112,6 +112,9 @@ export function Header({ onMenuToggle }: HeaderProps) {
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="flex items-center gap-2">
             <Avatar className="h-8 w-8">
+              {user?.user_metadata?.avatar_url && (
+                <AvatarImage src={user.user_metadata.avatar_url} alt={userName} />
+              )}
               <AvatarFallback className="bg-primary/10 text-primary text-xs">
                 {userInitials}
               </AvatarFallback>

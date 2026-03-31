@@ -154,7 +154,12 @@ export default function ABTestingPage() {
   const [generalInsights, setGeneralInsights] = useState<string[]>([])
   const [suggestionsLoading, setSuggestionsLoading] = useState(false)
 
-  // (variation dialog removed)
+  // Variation dialog
+  const [variationDialog, setVariationDialog] = useState(false)
+  const [variations, setVariations] = useState<Variation[]>([])
+  const [variationLoading, setVariationLoading] = useState(false)
+  const [variationCreative, setVariationCreative] = useState<string>('')
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
 
   // Sort
   const [sortKey, setSortKey] = useState<SortKey>('score')
@@ -522,6 +527,7 @@ export default function ABTestingPage() {
                         Score <SortIcon column="score" />
                       </button>
                     </TableHead>
+                    <TableHead className="text-center text-xs w-[50px]">Variar</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -636,6 +642,17 @@ export default function ABTestingPage() {
                               {c.score.toFixed(1)}
                             </span>
                           </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            title="Gerar variacoes"
+                            onClick={() => handleGenerateVariation(c.name)}
+                          >
+                            <Sparkles className="h-3.5 w-3.5 text-violet-500" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     )
@@ -768,6 +785,94 @@ export default function ABTestingPage() {
         </CardContent>
       </Card>
 
+      {/* Variation Dialog */}
+      <Dialog open={variationDialog} onOpenChange={setVariationDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-violet-500" />
+              Variacoes do Criativo
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              Criativo: <span className="font-medium text-foreground">{variationCreative}</span>
+            </p>
+          </DialogHeader>
+
+          {variationLoading ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-3">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Gerando variacoes com IA...</p>
+            </div>
+          ) : variations.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+              <Sparkles className="h-10 w-10 mb-2 opacity-30" />
+              <p className="text-sm">Nenhuma variacao gerada</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {variations.map((v: Variation, idx: number) => (
+                <Card key={idx} className="border-l-4 border-l-violet-500">
+                  <CardContent className="pt-4 pb-3">
+                    <div className="flex items-start justify-between mb-2">
+                      <Badge variant="outline" className="font-mono text-xs">
+                        Variacao {idx + 1}
+                      </Badge>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 gap-1.5"
+                        onClick={() =>
+                          handleCopyVariation(
+                            idx,
+                            `Headline: ${v.headline}\nTexto: ${v.primaryText}\nCTA: ${v.cta}`
+                          )
+                        }
+                      >
+                        {copiedIdx === idx ? (
+                          <Check className="h-3.5 w-3.5 text-emerald-500" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" />
+                        )}
+                        {copiedIdx === idx ? 'Copiado' : 'Copiar'}
+                      </Button>
+                    </div>
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground">Headline</p>
+                        <p className="text-sm font-semibold">{v.headline}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground">Texto Principal</p>
+                        <p className="text-sm">{v.primaryText}</p>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground">CTA</p>
+                          <Badge variant="secondary" className="text-xs mt-0.5">
+                            {v.cta}
+                          </Badge>
+                        </div>
+                      </div>
+                      {v.rationale && (
+                        <div className="pt-2 border-t">
+                          <p className="text-xs font-medium text-muted-foreground">Racional</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">{v.rationale}</p>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setVariationDialog(false)}>
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

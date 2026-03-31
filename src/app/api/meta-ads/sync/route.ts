@@ -17,6 +17,7 @@ import {
   extractVideoPercent,
   getCreativeThumbnail,
 } from '@/lib/analytics/meta-ads-client'
+import { cacheMetaImagesBatch } from '@/lib/analytics/meta-image-cache'
 
 export const maxDuration = 120 // 2 min timeout
 
@@ -278,6 +279,22 @@ async function syncAccount(
   }
 }
 
+// Cache Meta CDN images to Supabase Storage (non-blocking, limited to 20 ads)
+async function cacheMetaAdImages(admin: SupabaseClient) {
+  const { data: ads } = await admin
+    .from('meta_ads')
+    .select('ad_id, org_id, image_url')
+    .like('image_url', 'https://scontent%')
+    .limit(20)
+
+  if (!ads || ads.length === 0) return
+
+  const cached = await cacheMetaImagesBatch(ads, 20)
+  if (cached > 0) {
+    console.log(`[meta-ads-sync] Cached ${cached} Meta CDN images to Supabase Storage`)
+  }
+}
+
 // Verifies CRON_SECRET from multiple header formats:
 // - Vercel Cron: Authorization: Bearer <secret>
 // - Custom: x-cron-secret: <secret>
@@ -327,6 +344,11 @@ export async function GET(request: NextRequest) {
       admin, account.org_id, account, 7, ['campaigns', 'adsets', 'ads']
     )
   }
+
+  // Fire-and-forget: cache Meta CDN images to Supabase Storage
+  cacheMetaAdImages(admin).catch((e) =>
+    console.warn('[meta-ads-sync] Image cache error (non-fatal):', e.message)
+  )
 
   return NextResponse.json({
     success: true,
@@ -395,6 +417,11 @@ export async function POST(request: NextRequest) {
         admin, orgId, account, daysBack, syncLevels
       )
     }
+
+    // Fire-and-forget: cache Meta CDN images to Supabase Storage
+    cacheMetaAdImages(admin).catch((e) =>
+      console.warn('[meta-ads-sync] Image cache error (non-fatal):', e.message)
+    )
 
     return NextResponse.json({
       success: true,

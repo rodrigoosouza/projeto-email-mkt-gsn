@@ -13,6 +13,8 @@ interface OrganizationContextType {
   isAdmin: boolean
   isEditor: boolean
   refetch: () => Promise<void>
+  childOrgs: Organization[]
+  allVisibleOrgs: Organization[]
 }
 
 const OrganizationContext = createContext<OrganizationContextType | undefined>(

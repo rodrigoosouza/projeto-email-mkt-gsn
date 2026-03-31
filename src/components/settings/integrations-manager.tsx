@@ -22,6 +22,7 @@ import {
   ChevronUp,
   Eye,
   EyeOff,
+  Instagram,
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -271,6 +272,34 @@ const PROVIDER_CATEGORIES: ProviderCategory[] = [
         fields: [
           { key: 'access_token', label: 'Access Token', placeholder: 'xxxxx', type: 'password', helpText: 'Vercel > Settings > Tokens > Create' },
           { key: 'team_id', label: 'Team ID', placeholder: 'team_xxxxx', helpText: 'Vercel > Settings (do team) > General > Team ID' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Redes Sociais',
+    description: 'Conecte suas contas de redes sociais para publicacao e monitoramento',
+    providers: [
+      {
+        provider: 'instagram',
+        name: 'Instagram Business',
+        description: 'Publique conteudo e monitore metricas do Instagram Business.',
+        icon: Instagram,
+        helpUrl: 'https://business.facebook.com/settings/instagram-accounts',
+        helpLabel: 'Abrir Meta Business Settings',
+        setupSteps: [
+          'Converta seu perfil do Instagram para conta Business ou Creator',
+          'Conecte o Instagram a uma Pagina do Facebook no Meta Business Suite',
+          'Acesse developers.facebook.com e crie um app (tipo Business)',
+          'No app, adicione o produto "Instagram Graph API"',
+          'Gere um Access Token com permissoes: instagram_basic, instagram_content_publish, pages_show_list',
+          'Copie o Instagram Business Account ID (encontre via API Explorer: /me/accounts → ig_business_account)',
+          'Copie o Facebook Page ID da pagina conectada',
+        ],
+        fields: [
+          { key: 'instagram_business_id', label: 'Instagram Business Account ID', placeholder: '17841400123456789', helpText: 'ID da conta Business do Instagram (encontre via Graph API Explorer)' },
+          { key: 'facebook_page_id', label: 'Facebook Page ID', placeholder: '123456789012345', helpText: 'ID da Pagina do Facebook conectada ao Instagram' },
+          { key: 'access_token', label: 'Access Token', placeholder: 'EAAxxxxx', type: 'password', helpText: 'Token de longa duracao com permissoes instagram_basic e instagram_content_publish' },
         ],
       },
     ],

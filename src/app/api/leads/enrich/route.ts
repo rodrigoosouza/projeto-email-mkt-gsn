@@ -8,7 +8,7 @@ export const maxDuration = 60
 export async function POST(req: NextRequest) {
   try {
     // Auth check — allow internal calls via x-internal header or authenticated users
-    const isInternal = req.headers.get('x-internal-key') === (process.env.SUPABASE_SERVICE_ROLE_KEY || '').slice(0, 20)
+    const isInternal = req.headers.get('x-internal-key') === (process.env.INTERNAL_API_SECRET || '')
     if (!isInternal) {
       const supabase = await createClient()
       const { data: { user } } = await supabase.auth.getUser()

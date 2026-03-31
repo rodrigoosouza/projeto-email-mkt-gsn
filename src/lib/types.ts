@@ -38,6 +38,8 @@ export enum OperatorType {
 }
 
 // ============= ORGANIZATIONS =============
+export type OrgType = 'agency' | 'client' | 'sub_client'
+
 export interface Organization {
   id: string
   name: string
@@ -51,6 +53,12 @@ export interface Organization {
   created_at: string
   updated_at: string
   created_by: string
+  // Hierarchical org fields (optional, additive)
+  parent_org_id?: string | null
+  org_type?: OrgType
+  depth?: number
+  settings?: Record<string, any>
+  children?: Organization[]
 }
 
 // ============= USERS =============
@@ -291,6 +299,7 @@ export type IntegrationProvider =
   | 'openrouter'
   | 'n8n'
   | 'vercel'
+  | 'instagram'
 
 export interface Integration {
   id: string

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { rateLimit } from '@/lib/rate-limit'
 
 async function hashApiKey(apiKey: string): Promise<string> {
   const encoder = new TextEncoder()
@@ -100,6 +101,12 @@ function mapLeadData(body: Record<string, any>): {
 
 export async function POST(request: NextRequest) {
   try {
+    const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown'
+    const { success: rateLimitOk, remaining } = rateLimit(`webhook:${clientIp}`, 100, 60000) // 100 requests per minute
+    if (!rateLimitOk) {
+      return NextResponse.json({ error: 'Rate limit exceeded. Max 100 requests per minute.' }, { status: 429 })
+    }
+
     const apiKey = request.headers.get('x-api-key')
     if (!apiKey) {
       return NextResponse.json({ error: 'Missing API key. Send x-api-key header.' }, { status: 401 })

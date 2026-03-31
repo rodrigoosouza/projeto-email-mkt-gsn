@@ -55,6 +55,18 @@ function activityIcon(type: string) {
   }
 }
 
+function sanitizeHtml(html: string): string {
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+    .replace(/on\w+="[^"]*"/gi, '')
+    .replace(/on\w+='[^']*'/gi, '')
+    .replace(/javascript:/gi, '')
+    .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '')
+    .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, '')
+    .replace(/<form\b[^<]*(?:(?!<\/form>)<[^<]*)*<\/form>/gi, '')
+}
+
 export default function DealDetailPage() {
   const params = useParams()
   const router = useRouter()
@@ -387,7 +399,7 @@ export default function DealDetailPage() {
                         </span>
                         {note.pinned_to_deal_flag && <Badge variant="secondary" className="text-xs">Fixada</Badge>}
                       </div>
-                      <div className="text-sm prose prose-sm dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: note.content }} />
+                      <div className="text-sm prose prose-sm dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: sanitizeHtml(note.content) }} />
                     </div>
                   ))}
                 </div>

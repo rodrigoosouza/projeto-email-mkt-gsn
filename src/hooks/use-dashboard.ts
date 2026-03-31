@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useOrganizationContext } from '@/contexts/organization-context'
-import { getDashboardData, type DashboardData } from '@/lib/supabase/dashboard'
+import { getDashboardData, type DashboardData, type PeriodRange } from '@/lib/supabase/dashboard'
 
-export function useDashboard() {
+export function useDashboard(period?: PeriodRange) {
   const { currentOrg } = useOrganizationContext()
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -13,14 +13,14 @@ export function useDashboard() {
     if (!currentOrg) return
     setLoading(true)
     try {
-      const result = await getDashboardData(currentOrg.id)
+      const result = await getDashboardData(currentOrg.id, period)
       setData(result)
     } catch (error) {
       console.error('Erro ao buscar dados do dashboard:', error)
     } finally {
       setLoading(false)
     }
-  }, [currentOrg])
+  }, [currentOrg, period])
 
   useEffect(() => {
     fetchData()

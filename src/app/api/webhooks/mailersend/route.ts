@@ -26,18 +26,36 @@ const LEAD_EVENT_MAP: Record<string, { event_type: string; title: string }> = {
 
 export async function POST(request: NextRequest) {
   try {
-    // Optional: verify webhook signature
+    // Verify webhook signature (HMAC-SHA256)
     const webhookSecret = process.env.MAILERSEND_WEBHOOK_SECRET
+    let body: any
+
     if (webhookSecret) {
       const signature = request.headers.get('signature')
-      // For production, verify HMAC signature
-      // For now, just check if header exists when secret is configured
       if (!signature) {
         return NextResponse.json({ error: 'Missing signature' }, { status: 401 })
       }
-    }
+      // Verify HMAC-SHA256 signature
+      const bodyText = await request.text()
+      const encoder = new TextEncoder()
+      const key = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode(webhookSecret),
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign']
+      )
+      const mac = await crypto.subtle.sign('HMAC', key, encoder.encode(bodyText))
+      const expectedSignature = Array.from(new Uint8Array(mac)).map(b => b.toString(16).padStart(2, '0')).join('')
 
-    const body = await request.json()
+      if (signature !== expectedSignature) {
+        return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+      }
+      // Re-parse body since we consumed it as text
+      body = JSON.parse(bodyText)
+    } else {
+      body = await request.json()
+    }
     const supabase = createAdminClient()
 
     // MailerSend sends webhook data in this format:

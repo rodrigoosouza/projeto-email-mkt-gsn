@@ -193,8 +193,7 @@ export async function bulkCreateLeads(
       continue
     }
     try {
-      await supabase.from('leads').upsert(
-        {
+      const payload: Record<string, any> = {
           org_id: orgId,
           email: lead.email,
           first_name: lead.first_name || null,
@@ -203,9 +202,10 @@ export async function bulkCreateLeads(
           company: lead.company || null,
           position: lead.position || null,
           source: lead.source || 'csv',
-        },
-        { onConflict: 'org_id,email' }
-      )
+        }
+      if (lead.score !== undefined) payload.score = lead.score
+      if ((lead as any).custom_fields) payload.custom_fields = (lead as any).custom_fields
+      await supabase.from('leads').upsert(payload, { onConflict: 'org_id,email' })
       created++
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Erro desconhecido'

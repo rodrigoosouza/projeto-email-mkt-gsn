@@ -7,7 +7,7 @@ import {
   Eye, ArrowRight, Clock, CheckCircle2, RefreshCw,
   Image, Layers, Video, BarChart3, ArrowDown, Percent,
   Globe, Monitor, Smartphone, Tablet, MapPin, Zap, FileText,
-  Activity, Timer,
+  Activity, Timer, Megaphone,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -162,7 +162,7 @@ export default function GrowthAnalysisPage() {
     setGa4Error(null)
     try {
       const { start, end } = ga4DateMap[dateFilter]
-      const res = await fetch(`/api/analytics/ga4?startDate=${start}&endDate=${end}`)
+      const res = await fetch(`/api/analytics/ga4?startDate=${start}&endDate=${end}&orgId=${orgId}`)
       if (!res.ok) {
         const err = await res.json()
         throw new Error(err.error || 'Erro ao carregar GA4')
@@ -175,7 +175,7 @@ export default function GrowthAnalysisPage() {
     } finally {
       setGa4Loading(false)
     }
-  }, [dateFilter])
+  }, [dateFilter, orgId])
 
   const handleSync = async () => {
     if (!orgId) return; setSyncing(true)
@@ -267,6 +267,49 @@ export default function GrowthAnalysisPage() {
     })
     return Array.from(map.values()).sort((a,b) => b.leads - a.leads)
   }, [fAdsets, adsetMetaMap])
+
+  // === VENDAS POR CRIATIVO (utm_term) — para cruzar com Meta Ads ===
+  const wonByCreative = useMemo(() => {
+    const map = new Map<string, { won: number; value: number }>()
+    deals.filter((d: any) => d.status === 'won' && d.utm_term).forEach((d: any) => {
+      const e = map.get(d.utm_term) || { won: 0, value: 0 }
+      e.won++; e.value += Number(d.value || 0)
+      map.set(d.utm_term, e)
+    })
+    return map
+  }, [deals])
+
+  // === VENDAS POR PUBLICO (utm_content) — para cruzar com Meta Ads ===
+  const wonByAudience = useMemo(() => {
+    const map = new Map<string, { won: number; value: number }>()
+    deals.filter((d: any) => d.status === 'won' && d.utm_content).forEach((d: any) => {
+      const e = map.get(d.utm_content) || { won: 0, value: 0 }
+      e.won++; e.value += Number(d.value || 0)
+      map.set(d.utm_content, e)
+    })
+    return map
+  }, [deals])
+
+  // === CAMPANHAS META ADS COM VENDAS ===
+  const campaignStats = useMemo(() => {
+    const map = new Map<string, { name: string; spend: number; imp: number; clicks: number; leads: number; won: number; wonValue: number; lost: number }>()
+    fCampaigns.forEach(c => {
+      const name = c.campaign_name
+      const e = map.get(name) || { name, spend: 0, imp: 0, clicks: 0, leads: 0, won: 0, wonValue: 0, lost: 0 }
+      e.spend += Number(c.spend); e.imp += Number(c.impressions); e.clicks += Number(c.clicks); e.leads += Number(c.leads)
+      map.set(name, e)
+    })
+    // Cross with CRM deals by utm_campaign
+    deals.forEach((d: any) => {
+      if (!d.utm_campaign) return
+      const e = map.get(d.utm_campaign)
+      if (e) {
+        if (d.status === 'won') { e.won++; e.wonValue += Number(d.value || 0) }
+        if (d.status === 'lost') e.lost++
+      }
+    })
+    return Array.from(map.values()).sort((a, b) => b.spend - a.spend)
+  }, [fCampaigns, deals])
 
   // === CRIATIVOS NO CRM ===
   const wonDealsAll = useMemo(() => {
@@ -376,6 +419,7 @@ export default function GrowthAnalysisPage() {
         <TabsList className="bg-muted/50 p-1">
           <TabsTrigger value="creatives" className="gap-1.5 text-xs"><Image className="h-3.5 w-3.5" /> Criativos</TabsTrigger>
           <TabsTrigger value="audiences" className="gap-1.5 text-xs"><Layers className="h-3.5 w-3.5" /> Publicos</TabsTrigger>
+          <TabsTrigger value="campaigns" className="gap-1.5 text-xs"><Megaphone className="h-3.5 w-3.5" /> Campanhas</TabsTrigger>
           <TabsTrigger value="crm_creatives" className="gap-1.5 text-xs"><TrendingUp className="h-3.5 w-3.5" /> Criativos no CRM</TabsTrigger>
           <TabsTrigger value="crm_funnel" className="gap-1.5 text-xs"><Target className="h-3.5 w-3.5" /> Funil CRM</TabsTrigger>
           <TabsTrigger value="ga4" className="gap-1.5 text-xs" onClick={() => { if (!ga4Data && !ga4Loading) loadGA4() }}><Globe className="h-3.5 w-3.5" /> Google Analytics</TabsTrigger>
@@ -394,7 +438,7 @@ export default function GrowthAnalysisPage() {
                   <TableHeader>
                     <TableRow className="bg-muted/30">
                       <TableHead className="w-[50px] pl-4"></TableHead><TableHead className="text-xs">Criativo</TableHead>
-                      <TableHead className="text-right text-xs">Leads</TableHead><TableHead className="text-right text-xs">CPL</TableHead>
+                      <TableHead className="text-right text-xs">Leads</TableHead><TableHead className="text-right text-xs">Vendas</TableHead><TableHead className="text-right text-xs">Receita</TableHead><TableHead className="text-right text-xs">CPL</TableHead>
                       <TableHead className="text-right text-xs">Conv.</TableHead>
                       <TableHead className="text-right text-xs">Invest.</TableHead><TableHead className="text-right text-xs">Cliques</TableHead><TableHead className="text-right text-xs pr-4">CTR</TableHead>
                     </TableRow>
@@ -402,6 +446,7 @@ export default function GrowthAnalysisPage() {
                   <TableBody>
                     {topCreatives.filter(c=>c.leads>0).slice(0,15).map((c, i) => {
                       const ctr = c.imp>0?(c.clicks/c.imp)*100:0, cpl = c.leads>0?c.spend/c.leads:0, conv = c.clicks>0?(c.leads/c.clicks)*100:0
+                      const crmData = wonByCreative.get(c.name) || { won: 0, value: 0 }
                       const isVideo = c.name?.toLowerCase().includes('video')
                       const isTop3 = i < 3
                       return (
@@ -417,6 +462,8 @@ export default function GrowthAnalysisPage() {
                             <div className="flex items-center gap-1.5 mt-0.5">{c.headline && <span className="text-[11px] text-muted-foreground">{c.headline}</span>}{c.adsets>1 && <Badge variant="outline" className="text-[10px] py-0 h-4">{c.adsets} conj.</Badge>}</div>
                           </TableCell>
                           <TableCell className="text-right"><span className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">{c.leads}</span></TableCell>
+                          <TableCell className="text-right">{crmData.won > 0 ? <span className="font-bold text-green-600 dark:text-green-400 text-sm">{crmData.won}</span> : <span className="text-muted-foreground text-sm">-</span>}</TableCell>
+                          <TableCell className="text-right">{crmData.value > 0 ? <span className="text-sm font-medium text-green-600 dark:text-green-400">{fmt$(crmData.value)}</span> : <span className="text-muted-foreground text-sm">-</span>}</TableCell>
                           <TableCell className="text-right text-sm">{fmt$(cpl)}</TableCell>
                           <TableCell className="text-right"><span className={cn('text-xs font-semibold px-1.5 py-0.5 rounded', conv>mkt.convRate ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'text-muted-foreground')}>{fmtP(conv)}</span></TableCell>
                           <TableCell className="text-right text-sm text-muted-foreground">{fmt$(c.spend)}</TableCell>
@@ -465,17 +512,21 @@ export default function GrowthAnalysisPage() {
                 <Table>
                   <TableHeader><TableRow className="bg-muted/30">
                     <TableHead className="text-xs pl-4 min-w-[350px]">Publico</TableHead><TableHead className="text-right text-xs">Leads</TableHead>
+                    <TableHead className="text-right text-xs">Vendas</TableHead><TableHead className="text-right text-xs">Receita</TableHead>
                     <TableHead className="text-right text-xs">CPL</TableHead><TableHead className="text-right text-xs">Conv.</TableHead>
                     <TableHead className="text-right text-xs">Invest.</TableHead><TableHead className="text-right text-xs pr-4">CTR</TableHead>
                   </TableRow></TableHeader>
                   <TableBody>
                     {topAudiences.filter(a=>a.leads>0).slice(0,15).map(a => {
                       const cpl=a.leads>0?a.spend/a.leads:0, ctr=a.imp>0?(a.clicks/a.imp)*100:0, conv=a.clicks>0?(a.leads/a.clicks)*100:0
+                      const audCrm = wonByAudience.get(a.name) || { won: 0, value: 0 }
                       const isRmk=a.name?.toLowerCase().includes('remarketing'), isLAL=a.name?.toLowerCase().includes('lookalike')
                       return (
                         <TableRow key={a.name}>
                           <TableCell className="pl-4"><div className="flex items-center gap-2"><span className={cn('w-1.5 h-6 rounded-full shrink-0', isRmk?'bg-orange-400':isLAL?'bg-purple-400':'bg-blue-400')} /><span className="text-sm break-words">{a.name}</span></div></TableCell>
                           <TableCell className="text-right"><span className="font-bold text-emerald-600 dark:text-emerald-400">{a.leads}</span></TableCell>
+                          <TableCell className="text-right">{audCrm.won > 0 ? <span className="font-bold text-green-600 dark:text-green-400">{audCrm.won}</span> : <span className="text-muted-foreground">-</span>}</TableCell>
+                          <TableCell className="text-right">{audCrm.value > 0 ? <span className="text-sm font-medium text-green-600 dark:text-green-400">{fmt$(audCrm.value)}</span> : <span className="text-muted-foreground">-</span>}</TableCell>
                           <TableCell className="text-right text-sm">{fmt$(cpl)}</TableCell>
                           <TableCell className="text-right"><span className={cn('text-xs font-semibold px-1.5 py-0.5 rounded', conv>mkt.convRate?'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400':'text-muted-foreground')}>{fmtP(conv)}</span></TableCell>
                           <TableCell className="text-right text-sm text-muted-foreground">{fmt$(a.spend)}</TableCell>
@@ -486,6 +537,62 @@ export default function GrowthAnalysisPage() {
                   </TableBody>
                 </Table>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* === CAMPANHAS COM VENDAS === */}
+        <TabsContent value="campaigns" className="space-y-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold">Performance por Campanha</CardTitle>
+              <CardDescription className="text-xs">Campanhas Meta Ads cruzadas com vendas do CRM</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/30">
+                      <TableHead className="text-xs pl-4 min-w-[300px]">Campanha</TableHead>
+                      <TableHead className="text-right text-xs">Leads</TableHead>
+                      <TableHead className="text-right text-xs">Vendas</TableHead>
+                      <TableHead className="text-right text-xs">Receita</TableHead>
+                      <TableHead className="text-right text-xs">ROAS</TableHead>
+                      <TableHead className="text-right text-xs">CPL</TableHead>
+                      <TableHead className="text-right text-xs">Conv.</TableHead>
+                      <TableHead className="text-right text-xs">Invest.</TableHead>
+                      <TableHead className="text-right text-xs">Cliques</TableHead>
+                      <TableHead className="text-right text-xs pr-4">CTR</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {campaignStats.filter(c => c.leads > 0 || c.won > 0).map((c, i) => {
+                      const ctr = c.imp > 0 ? (c.clicks / c.imp) * 100 : 0
+                      const cpl = c.leads > 0 ? c.spend / c.leads : 0
+                      const conv = c.clicks > 0 ? (c.leads / c.clicks) * 100 : 0
+                      const campaignRoas = c.spend > 0 ? c.wonValue / c.spend : 0
+                      const isTop = c.won > 0
+                      return (
+                        <TableRow key={c.name} className={cn(isTop && 'bg-emerald-50/50 dark:bg-emerald-950/10')}>
+                          <TableCell className="pl-4">
+                            <span className="text-sm break-words max-w-[300px] block">{c.name}</span>
+                          </TableCell>
+                          <TableCell className="text-right"><span className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">{c.leads}</span></TableCell>
+                          <TableCell className="text-right">{c.won > 0 ? <span className="font-bold text-green-600 dark:text-green-400 text-sm">{c.won}</span> : <span className="text-muted-foreground text-sm">-</span>}</TableCell>
+                          <TableCell className="text-right">{c.wonValue > 0 ? <span className="text-sm font-medium text-green-600 dark:text-green-400">{fmt$(c.wonValue)}</span> : <span className="text-muted-foreground text-sm">-</span>}</TableCell>
+                          <TableCell className="text-right">{campaignRoas > 0 ? <span className={cn('text-xs font-semibold px-1.5 py-0.5 rounded', campaignRoas >= 3 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : campaignRoas >= 1 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700')}>{campaignRoas.toFixed(1)}x</span> : <span className="text-muted-foreground text-sm">-</span>}</TableCell>
+                          <TableCell className="text-right text-sm">{fmt$(cpl)}</TableCell>
+                          <TableCell className="text-right"><span className={cn('text-xs font-semibold px-1.5 py-0.5 rounded', conv > mkt.convRate ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'text-muted-foreground')}>{fmtP(conv)}</span></TableCell>
+                          <TableCell className="text-right text-sm text-muted-foreground">{fmt$(c.spend)}</TableCell>
+                          <TableCell className="text-right text-sm text-muted-foreground">{fmtN(c.clicks)}</TableCell>
+                          <TableCell className="text-right text-sm text-muted-foreground pr-4">{fmtP(ctr)}</TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+              {campaignStats.filter(c => c.leads > 0 || c.won > 0).length === 0 && <p className="text-center text-muted-foreground py-8 text-sm">Nenhuma campanha com leads no periodo</p>}
             </CardContent>
           </Card>
         </TabsContent>

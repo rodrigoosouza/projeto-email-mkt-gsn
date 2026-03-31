@@ -39,7 +39,10 @@ export async function POST(request: NextRequest) {
         // Find org by phone_number_id in integrations config or env
         // For now, use a default org lookup approach
         const orgId = await resolveOrgId(supabase, phoneNumberId)
-        if (!orgId) continue
+        if (!orgId) {
+          console.warn('[WhatsApp] Could not resolve org for phone_number_id:', phoneNumberId)
+          continue
+        }
 
         // Handle incoming messages
         for (const message of value?.messages || []) {
@@ -76,17 +79,9 @@ async function resolveOrgId(supabase: ReturnType<typeof createAdminClient>, phon
         return config.org_id
       }
     }
-    // Fallback: return first active whatsapp integration
-    return data[0].org_id
   }
 
-  // Fallback: if only one org exists, use that
-  const { data: orgs } = await supabase
-    .from('organizations')
-    .select('id')
-    .limit(1)
-
-  return orgs?.[0]?.id || null
+  return null // Reject webhook if org cannot be determined
 }
 
 async function handleIncomingMessage(

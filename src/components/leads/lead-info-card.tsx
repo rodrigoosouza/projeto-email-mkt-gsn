@@ -377,7 +377,11 @@ export function LeadInfoCard({ lead, onUpdate }: LeadInfoCardProps) {
                 segmento: 'Segmento', porte: 'Porte', faturamento: 'Faturamento',
                 funcionarios: 'Funcionarios', cnpj: 'CNPJ', nivel_qualificacao: 'Nivel',
                 cidade: 'Cidade', estado: 'Estado', website: 'Website',
-                prioridade: 'Prioridade', data_reuniao: 'Reuniao',
+                prioridade: 'Prioridade', data_reuniao: 'Reuniao', horario_reuniao: 'Horario',
+                status_reuniao: 'Status Reuniao', software_gestao: 'Software Gestao',
+                copy_variant: 'Variante', lead_status_externo: 'Status Externo',
+                deal_stage: 'Etapa CRM', deal_owner: 'Responsavel CRM',
+                nps: 'NPS',
               }
 
               // Campos de tracking (seção separada)
@@ -387,7 +391,14 @@ export function LeadInfoCard({ lead, onUpdate }: LeadInfoCardProps) {
               }
 
               // Campos escondidos (muito longos ou técnicos)
-              const HIDDEN = new Set(['fbclid', 'landing_page', 'diagnostico_pipedrive', 'pilares_diagnostico', 'observacoes_pipedrive'])
+              const HIDDEN = new Set([
+                'fbclid', 'gclid', 'gbraid', 'wbraid', 'ttclid', 'msclkid', 'li_fat_id', 'sck',
+                'gad_campaignid', 'gad_source',
+                'landing_page', 'origin_page', 'apex_session_id', 'session_attributes_encoded',
+                'diagnostico_pipedrive', 'pilares_diagnostico', 'observacoes_pipedrive',
+                'external_system_id', 'pipedrive_deal_id', 'pipedrive_person_id', 'pipedrive_org_id',
+                'manychat_subscriber_id', 'deal_id', 'deal_status',
+              ])
 
               const mainFields = Object.entries(cf)
                 .filter(([key, val]) => !definedNames.has(key) && val && MAIN_FIELDS[key])
@@ -397,7 +408,13 @@ export function LeadInfoCard({ lead, onUpdate }: LeadInfoCardProps) {
                 .filter(([key, val]) => !definedNames.has(key) && val && TRACKING_FIELDS[key])
                 .filter(([, val]) => !Array.isArray(val) && typeof val !== 'object')
 
-              if (mainFields.length === 0 && trackingFields.length === 0) return null
+              // Campos extras (tudo que não é main, tracking ou hidden)
+              const extraFields = Object.entries(cf)
+                .filter(([key, val]) => !definedNames.has(key) && val && !MAIN_FIELDS[key] && !TRACKING_FIELDS[key] && !HIDDEN.has(key))
+                .filter(([, val]) => !Array.isArray(val) && typeof val !== 'object')
+                .filter(([, val]) => String(val).length < 100) // skip very long values
+
+              if (mainFields.length === 0 && trackingFields.length === 0 && extraFields.length === 0) return null
 
               return (
                 <>
@@ -420,6 +437,16 @@ export function LeadInfoCard({ lead, onUpdate }: LeadInfoCardProps) {
                             <p className="text-xs text-muted-foreground">{TRACKING_FIELDS[key]}</p>
                             <p className="text-xs font-medium truncate" title={String(val)}>{String(val)}</p>
                           </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {extraFields.length > 0 && (
+                    <div className="pt-4 border-t">
+                      <p className="text-sm font-medium text-muted-foreground mb-3">Outros Dados</p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8">
+                        {extraFields.map(([key, val]) => (
+                          <InfoField key={key} label={key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} value={String(val)} />
                         ))}
                       </div>
                     </div>

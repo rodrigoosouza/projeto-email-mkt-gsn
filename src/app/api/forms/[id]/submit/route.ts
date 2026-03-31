@@ -140,7 +140,7 @@ export async function POST(
         // Auto-enrich lead if has company (fire-and-forget, internal call)
         if (lead.company && lead.enrichment_status !== 'enriched') {
           const enrichUrl = `${process.env.NEXT_PUBLIC_APP_URL || request.headers.get('origin') || ''}/api/leads/enrich`
-          const internalKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').slice(0, 20)
+          const internalKey = process.env.INTERNAL_API_SECRET || ''
           fetch(enrichUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-internal-key': internalKey },

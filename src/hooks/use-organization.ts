@@ -1,11 +1,50 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Organization, OrganizationMember } from '@/lib/types'
 import { UserRole } from '@/lib/types'
 
 const ORG_STORAGE_KEY = 'plataforma-email-org-id'
+
+/**
+ * Build a tree structure from a flat list of orgs.
+ * Orgs without parent_org_id remain at root level.
+ */
+function buildOrgTree(flatOrgs: Organization[]): Organization[] {
+  const orgMap = new Map<string, Organization>()
+  flatOrgs.forEach((org) => {
+    orgMap.set(org.id, { ...org, children: [] })
+  })
+
+  const roots: Organization[] = []
+  orgMap.forEach((org) => {
+    if (org.parent_org_id && orgMap.has(org.parent_org_id)) {
+      orgMap.get(org.parent_org_id)!.children!.push(org)
+    } else {
+      roots.push(org)
+    }
+  })
+
+  return roots
+}
+
+/**
+ * Flatten a tree of orgs back into a flat list (depth-first).
+ */
+function flattenOrgTree(tree: Organization[]): Organization[] {
+  const result: Organization[] = []
+  function walk(orgs: Organization[]) {
+    for (const org of orgs) {
+      result.push(org)
+      if (org.children && org.children.length > 0) {
+        walk(org.children)
+      }
+    }
+  }
+  walk(tree)
+  return result
+}
 
 export function useOrganization() {
   const [organizations, setOrganizations] = useState<Organization[]>([])
@@ -100,6 +139,24 @@ export function useOrganization() {
   const isAdmin = membership?.role === UserRole.ADMIN
   const isEditor = membership?.role === UserRole.EDITOR || isAdmin
 
+  // Hierarchical org helpers — derived from organizations list
+  const orgTree = useMemo(() => buildOrgTree(organizations), [organizations])
+  const allVisibleOrgs = useMemo(() => flattenOrgTree(orgTree), [orgTree])
+  const childOrgs = useMemo(() => {
+    if (!currentOrg) return []
+    const findInTree = (orgs: Organization[]): Organization[] => {
+      for (const org of orgs) {
+        if (org.id === currentOrg.id) return org.children || []
+        if (org.children && org.children.length > 0) {
+          const found = findInTree(org.children)
+          if (found.length > 0) return found
+        }
+      }
+      return []
+    }
+    return findInTree(orgTree)
+  }, [currentOrg, orgTree])
+
   return {
     organizations,
     currentOrg,
@@ -109,5 +166,7 @@ export function useOrganization() {
     isAdmin,
     isEditor,
     refetch: fetchOrganizations,
+    childOrgs,
+    allVisibleOrgs,
   }
 }

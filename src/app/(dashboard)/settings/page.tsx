@@ -11,6 +11,7 @@ import { CustomFieldsManager } from '@/components/settings/custom-fields-manager
 import { ScoringRulesManager } from '@/components/settings/scoring-rules-manager'
 import { IntegrationsManager } from '@/components/settings/integrations-manager'
 import { AppearanceSettings } from '@/components/settings/appearance-settings'
+import { PermissionsManager } from '@/components/settings/permissions-manager'
 
 export default function SettingsPage() {
   return (
@@ -32,6 +33,7 @@ export default function SettingsPage() {
           <TabsTrigger value="lead-scoring">Lead Scoring</TabsTrigger>
           <TabsTrigger value="integrations">Integracoes</TabsTrigger>
           <TabsTrigger value="appearance">Aparencia</TabsTrigger>
+          <TabsTrigger value="permissions">Permissoes</TabsTrigger>
         </TabsList>
 
         <TabsContent value="organization">
@@ -75,6 +77,10 @@ export default function SettingsPage() {
 
         <TabsContent value="appearance">
           <AppearanceSettings />
+        </TabsContent>
+
+        <TabsContent value="permissions">
+          <PermissionsManager />
         </TabsContent>
       </Tabs>
     </div>

@@ -95,19 +95,31 @@ export function mapCsvRows(
   const leads: CreateLeadPayload[] = []
 
   for (const row of rows) {
-    const lead: Record<string, string | number> = {}
+    const lead: Record<string, any> = {}
+    const customFields: Record<string, string> = {}
 
     for (let colIndex = 0; colIndex < headers.length; colIndex++) {
       const field = columnMapping[colIndex]
       if (!field || field === 'ignore') continue
 
       const value = row[colIndex] || ''
-      if (field === 'score') {
+      if (!value) continue
+
+      // Custom fields go to custom_fields object
+      if (field.startsWith('custom:')) {
+        const customKey = field.replace('custom:', '')
+        customFields[customKey] = value
+      } else if (field === 'score') {
         const parsed = parseInt(value, 10)
         lead[field] = isNaN(parsed) ? 0 : Math.min(100, Math.max(0, parsed))
       } else {
         lead[field] = value
       }
+    }
+
+    // Merge custom fields if any
+    if (Object.keys(customFields).length > 0) {
+      lead.custom_fields = customFields
     }
 
     if (lead.email) {

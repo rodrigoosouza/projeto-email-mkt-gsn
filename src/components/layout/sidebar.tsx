@@ -21,6 +21,7 @@ import {
   Link as LinkIcon,
   Activity,
   Globe,
+  BookOpen,
   Settings,
   LogOut,
   ChevronDown,
@@ -36,6 +37,10 @@ import {
   Handshake,
   TrendingUp,
   FlaskConical,
+  Sparkles,
+  Brain,
+  Radar,
+  MapPin,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -53,7 +58,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
@@ -112,16 +117,20 @@ const navigationGroups: NavGroup[] = [
       { name: 'Analise MKT e Vendas', href: '/growth', icon: TrendingUp },
       { name: 'IA Growth Copilot', href: '/growth/chat', icon: Zap },
       { name: 'A/B Testing', href: '/ads/ab-testing', icon: FlaskConical },
-      { name: 'Criar Campanha ADS', href: '/ads', icon: Megaphone },
+      { name: 'Criar Campanha', href: '/ads/create', icon: Megaphone },
+      { name: 'Campanhas IA', href: '/ads', icon: Sparkles },
       { name: 'Publicos', href: '/audience-exports', icon: Share2 },
     ],
   },
   {
     label: 'Web',
     items: [
+      { name: 'Site', href: '/site', icon: Globe },
       { name: 'Landing Pages', href: '/landing-pages', icon: Globe },
+      { name: 'Blog', href: '/blog', icon: BookOpen },
       { name: 'Formularios', href: '/forms', icon: FileInput },
       { name: 'SEO', href: '/seo', icon: Search },
+      { name: 'AIEO/GEO', href: '/seo/aieo', icon: Brain },
       { name: 'Tracking', href: '/tracking', icon: Activity },
     ],
   },
@@ -142,9 +151,16 @@ const navigationGroups: NavGroup[] = [
     label: 'Mensageria',
     items: [
       { name: 'WhatsApp', href: '/whatsapp', icon: MessageCircle },
+      { name: 'Radar de Grupos', href: '/whatsapp/radar', icon: Radar },
       { name: 'Fluxos', href: '/whatsapp/flows', icon: Workflow },
       { name: 'SMS', href: '/sms', icon: Smartphone },
       { name: 'Chatbot', href: '/chatbot', icon: Bot },
+    ],
+  },
+  {
+    label: 'Prospeccao',
+    items: [
+      { name: 'Prospectar Empresas', href: '/prospection', icon: MapPin },
     ],
   },
   {
@@ -164,7 +180,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const { user, signOut } = useAuth()
-  const { organizations, currentOrg, switchOrganization, refetch } = useOrganizationContext()
+  const { organizations, currentOrg, switchOrganization, refetch, allVisibleOrgs } = useOrganizationContext()
   const { toast } = useToast()
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [newOrgName, setNewOrgName] = useState('')
@@ -223,9 +239,13 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 className="flex w-full items-center justify-between gap-2 px-2"
               >
                 <div className="flex items-center gap-2 truncate">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground text-sm font-bold">
-                    {currentOrg?.name?.charAt(0).toUpperCase() || 'O'}
-                  </div>
+                  {currentOrg?.logo_url ? (
+                    <img src={currentOrg.logo_url} alt={currentOrg.name} className="h-8 w-8 rounded-md object-contain bg-white" />
+                  ) : (
+                    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground text-sm font-bold">
+                      {currentOrg?.name?.charAt(0).toUpperCase() || 'O'}
+                    </div>
+                  )}
                   <span className="truncate text-sm font-semibold">
                     {currentOrg?.name || 'Selecionar Organizacao'}
                   </span>
@@ -239,19 +259,34 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   Nenhuma organizacao
                 </div>
               )}
-              {organizations.map((org) => (
-                <DropdownMenuItem
-                  key={org.id}
-                  onClick={() => switchOrganization(org.id)}
-                  className={cn(
-                    'cursor-pointer',
-                    currentOrg?.id === org.id && 'bg-accent'
-                  )}
-                >
-                  <Building2 className="mr-2 h-4 w-4" />
-                  {org.name}
-                </DropdownMenuItem>
-              ))}
+              {allVisibleOrgs.map((org) => {
+                const depth = org.depth ?? 0
+                const paddingLeft = depth * 16
+                return (
+                  <DropdownMenuItem
+                    key={org.id}
+                    onClick={() => switchOrganization(org.id)}
+                    className={cn(
+                      'cursor-pointer',
+                      currentOrg?.id === org.id && 'bg-accent'
+                    )}
+                    style={{ paddingLeft: `${paddingLeft + 8}px` }}
+                  >
+                    {depth > 0 && (
+                      <span className="mr-1 text-muted-foreground/50 text-xs select-none">{'└'}</span>
+                    )}
+                    <Building2 className={cn('mr-2 shrink-0', depth === 0 ? 'h-4 w-4' : 'h-3.5 w-3.5')} />
+                    <span className={cn(
+                      'truncate',
+                      depth === 0 && 'text-sm font-medium',
+                      depth === 1 && 'text-[13px]',
+                      depth >= 2 && 'text-xs text-muted-foreground'
+                    )}>
+                      {org.name}
+                    </span>
+                  </DropdownMenuItem>
+                )
+              })}
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => setShowCreateDialog(true)}
@@ -322,6 +357,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 className="flex w-full items-center justify-start gap-3 px-2"
               >
                 <Avatar className="h-8 w-8">
+                  {user?.user_metadata?.avatar_url && (
+                    <AvatarImage src={user.user_metadata.avatar_url} alt={userName} />
+                  )}
                   <AvatarFallback className="bg-muted text-xs">
                     {userInitials}
                   </AvatarFallback>

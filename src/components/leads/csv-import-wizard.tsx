@@ -2,10 +2,20 @@
 
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Upload, FileText, CheckCircle, AlertCircle, ArrowLeft, ArrowRight, Loader2 } from 'lucide-react'
+import { Upload, FileText, CheckCircle, AlertCircle, ArrowLeft, ArrowRight, Loader2, Plus } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   Select,
   SelectContent,
@@ -66,6 +76,33 @@ export function CsvImportWizard() {
   const [columnMapping, setColumnMapping] = useState<ColumnMapping>({})
   const [importing, setImporting] = useState(false)
   const [result, setResult] = useState<ImportResult | null>(null)
+  const [customFields, setCustomFields] = useState<{ value: string; label: string }[]>([])
+  const [newFieldDialog, setNewFieldDialog] = useState(false)
+  const [newFieldName, setNewFieldName] = useState('')
+  const [newFieldForColumn, setNewFieldForColumn] = useState<number | null>(null)
+
+  const addCustomField = () => {
+    if (!newFieldName.trim()) return
+    const slug = newFieldName.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_')
+    if (customFields.some(f => f.value === `custom:${slug}`)) return
+
+    const newField = { value: `custom:${slug}`, label: newFieldName.trim() }
+    setCustomFields(prev => [...prev, newField])
+
+    // Auto-map the column that triggered the dialog
+    if (newFieldForColumn !== null) {
+      setColumnMapping(prev => ({ ...prev, [newFieldForColumn]: newField.value }))
+    }
+
+    setNewFieldName('')
+    setNewFieldForColumn(null)
+    setNewFieldDialog(false)
+  }
+
+  const allFields = [
+    ...DB_FIELDS,
+    ...customFields,
+  ]
 
   const currentStepIndex = STEP_ORDER.indexOf(step)
 
@@ -337,23 +374,37 @@ export function CsvImportWizard() {
                         </p>
                       </div>
                       <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      <Select
-                        value={columnMapping[index] || 'ignore'}
-                        onValueChange={(value) =>
-                          setColumnMapping((prev) => ({ ...prev, [index]: value }))
-                        }
-                      >
-                        <SelectTrigger className="w-[180px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {DB_FIELDS.map((field) => (
-                            <SelectItem key={field.value} value={field.value}>
-                              {field.label}
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={columnMapping[index] || 'ignore'}
+                          onValueChange={(value) => {
+                            if (value === '__new_field__') {
+                              setNewFieldForColumn(index)
+                              setNewFieldName(header)
+                              setNewFieldDialog(true)
+                            } else {
+                              setColumnMapping((prev) => ({ ...prev, [index]: value }))
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="w-[200px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {allFields.map((field) => (
+                              <SelectItem key={field.value} value={field.value}>
+                                {field.label}
+                              </SelectItem>
+                            ))}
+                            <div className="border-t my-1" />
+                            <SelectItem value="__new_field__" className="text-primary font-medium">
+                              <span className="flex items-center gap-1">
+                                <Plus className="h-3 w-3" /> Criar campo
+                              </span>
                             </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
                   )
                 })}
@@ -383,6 +434,7 @@ export function CsvImportWizard() {
                   company: 'Empresa',
                   position: 'Cargo',
                   score: 'Score',
+                  ...Object.fromEntries(customFields.map(f => [f.value, f.label])),
                 }
 
                 return (
@@ -464,6 +516,40 @@ export function CsvImportWizard() {
       </Card>
 
       {/* Navigation */}
+      {/* Dialog: Criar campo personalizado */}
+      <Dialog open={newFieldDialog} onOpenChange={setNewFieldDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Criar campo personalizado</DialogTitle>
+            <DialogDescription>
+              Esse campo sera salvo nos dados extras do lead (custom_fields).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Nome do campo</Label>
+              <Input
+                value={newFieldName}
+                onChange={(e) => setNewFieldName(e.target.value)}
+                placeholder="Ex: Segmento, Faturamento, CNPJ..."
+                onKeyDown={(e) => { if (e.key === 'Enter') addCustomField() }}
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground">
+                Sera salvo como: <code className="bg-muted px-1 rounded">{newFieldName.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_') || '...'}</code>
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewFieldDialog(false)}>Cancelar</Button>
+            <Button onClick={addCustomField} disabled={!newFieldName.trim()}>
+              <Plus className="mr-2 h-4 w-4" />
+              Criar e mapear
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {step !== 'result' && (
         <div className="flex justify-between">
           <Button

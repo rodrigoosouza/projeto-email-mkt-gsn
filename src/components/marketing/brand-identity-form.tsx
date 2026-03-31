@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Save, Palette, Sparkles, Loader2, Crown, Upload, FileText, Image, X, Check, Type } from 'lucide-react'
+import { Save, Palette, Sparkles, Loader2, Crown, Upload, FileText, Image, X, Check, Type, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -49,6 +49,7 @@ const defaultBrand: BrandIdentity = {
   brand_promise: '',
   tagline_suggestions: [],
   fonts: [],
+  logo_url: '',
   logo_description: '',
   style_guide_url: '',
 }
@@ -542,6 +543,98 @@ export function BrandIdentityForm({ profile, onRefresh }: BrandIdentityFormProps
                     {font}
                   </Badge>
                 ))}
+              </div>
+            )}
+          </div>
+
+          {/* Logo Upload */}
+          <div className="space-y-2">
+            <Label>Logo da Marca</Label>
+            {brand.logo_url ? (
+              <div className="flex items-center gap-4">
+                <div className="relative w-24 h-24 rounded-lg border bg-white flex items-center justify-center overflow-hidden">
+                  <img src={brand.logo_url} alt="Logo" className="max-w-full max-h-full object-contain" />
+                </div>
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground truncate max-w-[250px]">{brand.logo_url.split('/').pop()}</p>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const input = document.createElement('input')
+                        input.type = 'file'
+                        input.accept = 'image/*'
+                        input.onchange = async (e) => {
+                          const file = (e.target as HTMLInputElement).files?.[0]
+                          if (!file || !currentOrg) return
+                          try {
+                            const { createClient } = await import('@/lib/supabase/client')
+                            const supabase = createClient()
+                            const ext = file.name.split('.').pop() || 'png'
+                            const path = `logos/${currentOrg.id}/${Date.now()}.${ext}`
+                            const { error } = await supabase.storage.from('ad-creatives').upload(path, file, { contentType: file.type, upsert: true })
+                            if (error) throw error
+                            const { data: urlData } = supabase.storage.from('ad-creatives').getPublicUrl(path)
+                            setBrand((prev) => ({ ...prev, logo_url: urlData.publicUrl }))
+                            // Also update org logo_url
+                            await supabase.from('organizations').update({ logo_url: urlData.publicUrl }).eq('id', currentOrg.id)
+                            toast({ title: 'Logo atualizado' })
+                          } catch (err: any) {
+                            toast({ title: 'Erro ao enviar logo', description: err.message, variant: 'destructive' })
+                          }
+                        }
+                        input.click()
+                      }}
+                    >
+                      <Upload className="mr-2 h-3 w-3" />
+                      Trocar
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive"
+                      onClick={() => setBrand((prev) => ({ ...prev, logo_url: '' }))}
+                    >
+                      <Trash2 className="mr-2 h-3 w-3" />
+                      Remover
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div
+                className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                onClick={() => {
+                  const input = document.createElement('input')
+                  input.type = 'file'
+                  input.accept = 'image/*'
+                  input.onchange = async (e) => {
+                    const file = (e.target as HTMLInputElement).files?.[0]
+                    if (!file || !currentOrg) return
+                    try {
+                      const { createClient } = await import('@/lib/supabase/client')
+                      const supabase = createClient()
+                      const ext = file.name.split('.').pop() || 'png'
+                      const path = `logos/${currentOrg.id}/${Date.now()}.${ext}`
+                      const { error } = await supabase.storage.from('ad-creatives').upload(path, file, { contentType: file.type, upsert: true })
+                      if (error) throw error
+                      const { data: urlData } = supabase.storage.from('ad-creatives').getPublicUrl(path)
+                      setBrand((prev) => ({ ...prev, logo_url: urlData.publicUrl }))
+                      await supabase.from('organizations').update({ logo_url: urlData.publicUrl }).eq('id', currentOrg.id)
+                      toast({ title: 'Logo enviado com sucesso' })
+                    } catch (err: any) {
+                      toast({ title: 'Erro ao enviar logo', description: err.message, variant: 'destructive' })
+                    }
+                  }
+                  input.click()
+                }}
+              >
+                <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                <p className="text-sm text-muted-foreground">Clique para enviar o logo</p>
+                <p className="text-xs text-muted-foreground">PNG, SVG, JPG (recomendado: fundo transparente)</p>
               </div>
             )}
           </div>

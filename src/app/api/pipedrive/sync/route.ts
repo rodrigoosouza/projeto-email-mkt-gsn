@@ -127,10 +127,9 @@ async function syncPipedrive(
       }
     }
 
-    // ===== AUTO-CREATE LEADS from new Pipedrive deals =====
+    // ===== AUTO-CREATE + UPDATE LEADS from Pipedrive deals =====
     if (syncType === 'deals' || syncType === 'full') {
       try {
-        // Get all deals with email
         const { data: allDeals } = await admin
           .from('pipedrive_deals')
           .select('deal_id,person_name,person_email,person_phone,org_name,owner_name,stage_name,status,utm_source,utm_medium,utm_campaign,utm_content,utm_term,add_time,update_time')
@@ -138,87 +137,139 @@ async function syncPipedrive(
           .not('person_email', 'is', null)
 
         if (allDeals && allDeals.length > 0) {
-          // Get existing lead emails to avoid duplicates
+          // Get ALL existing leads with their custom_fields for comparison
           const { data: existingLeads } = await admin
             .from('leads')
-            .select('email')
+            .select('id, email, custom_fields')
             .eq('org_id', orgId)
 
-          const existingEmails = new Set((existingLeads || []).map(l => l.email?.toLowerCase()))
+          const leadMap = new Map<string, { id: string; custom_fields: Record<string, any> }>()
+          for (const l of existingLeads || []) {
+            if (l.email) leadMap.set(l.email.toLowerCase(), { id: l.id, custom_fields: (l.custom_fields as Record<string, any>) || {} })
+          }
 
-          // Create leads for deals that don't have a matching lead
-          const newLeads = allDeals
-            .filter(d => d.person_email && !existingEmails.has(d.person_email.toLowerCase()))
-            .map(d => {
+          const newLeads: any[] = []
+          const events: any[] = []
+          let updatedCount = 0
+
+          for (const d of allDeals) {
+            if (!d.person_email) continue
+            const emailLower = d.person_email.toLowerCase()
+            const existing = leadMap.get(emailLower)
+
+            const dealFields = {
+              ...(d.utm_source ? { utm_source: d.utm_source } : {}),
+              ...(d.utm_medium ? { utm_medium: d.utm_medium } : {}),
+              ...(d.utm_campaign ? { utm_campaign: d.utm_campaign } : {}),
+              ...(d.utm_content ? { utm_content: d.utm_content } : {}),
+              ...(d.utm_term ? { utm_term: d.utm_term } : {}),
+              ...(d.owner_name ? { deal_owner: d.owner_name } : {}),
+              ...(d.stage_name ? { deal_stage: d.stage_name } : {}),
+              ...(d.status ? { deal_status: d.status } : {}),
+              deal_id: d.deal_id,
+              pipedrive_deal_id: d.deal_id,
+            }
+
+            if (existing) {
+              // === UPDATE existing lead — check what changed ===
+              const oldCf = existing.custom_fields
+              const changes: string[] = []
+
+              if (d.stage_name && oldCf.deal_stage !== d.stage_name) {
+                changes.push(`Etapa: "${oldCf.deal_stage || '-'}" → "${d.stage_name}"`)
+              }
+              if (d.status && oldCf.deal_status !== d.status) {
+                changes.push(`Status: "${oldCf.deal_status || '-'}" → "${d.status}"`)
+              }
+              if (d.owner_name && oldCf.deal_owner !== d.owner_name) {
+                changes.push(`Responsavel: "${oldCf.deal_owner || '-'}" → "${d.owner_name}"`)
+              }
+
+              if (changes.length > 0) {
+                // Update lead custom_fields with new deal data
+                const mergedCf = { ...oldCf, ...dealFields }
+                await admin.from('leads')
+                  .update({ custom_fields: mergedCf, updated_at: new Date().toISOString() })
+                  .eq('id', existing.id)
+
+                // Log the change in timeline
+                events.push({
+                  org_id: orgId,
+                  lead_id: existing.id,
+                  event_type: 'custom',
+                  title: 'CRM atualizado via Pipedrive',
+                  description: changes.join(' | '),
+                  metadata: {
+                    action: 'crm_update',
+                    deal_id: d.deal_id,
+                    stage: d.stage_name,
+                    status: d.status,
+                    owner: d.owner_name,
+                    changes,
+                    webhook_source: 'pipedrive_sync',
+                  },
+                })
+                updatedCount++
+              }
+            } else {
+              // === CREATE new lead ===
               const nameParts = (d.person_name || '').split(' ')
-              const firstName = nameParts[0] || null
-              const lastName = nameParts.slice(1).join(' ') || null
-
-              return {
+              newLeads.push({
                 org_id: orgId,
                 email: d.person_email,
-                first_name: firstName,
-                last_name: lastName,
+                first_name: nameParts[0] || null,
+                last_name: nameParts.slice(1).join(' ') || null,
                 phone: d.person_phone || null,
                 company: d.org_name || null,
                 source: d.utm_source || 'pipedrive',
                 external_id: String(d.deal_id),
                 created_at: d.add_time || new Date().toISOString(),
                 updated_at: d.update_time || d.add_time || new Date().toISOString(),
-                custom_fields: {
-                  ...(d.utm_source ? { utm_source: d.utm_source } : {}),
-                  ...(d.utm_medium ? { utm_medium: d.utm_medium } : {}),
-                  ...(d.utm_campaign ? { utm_campaign: d.utm_campaign } : {}),
-                  ...(d.utm_content ? { utm_content: d.utm_content } : {}),
-                  ...(d.utm_term ? { utm_term: d.utm_term } : {}),
-                  ...(d.owner_name ? { deal_owner: d.owner_name } : {}),
-                  ...(d.stage_name ? { deal_stage: d.stage_name } : {}),
-                  ...(d.status ? { deal_status: d.status } : {}),
-                  deal_id: d.deal_id,
-                  pipedrive_deal_id: d.deal_id,
-                },
-              }
-            })
+                custom_fields: dealFields,
+              })
+            }
+          }
 
+          // Batch create new leads
           if (newLeads.length > 0) {
-            // Batch upsert (onConflict handles duplicates)
             const { error: insertError } = await admin
               .from('leads')
               .upsert(newLeads, { onConflict: 'org_id,email', ignoreDuplicates: true })
 
-            if (insertError) {
-              console.warn('[Pipedrive Sync] Lead creation error (non-fatal):', insertError.message)
-            } else {
-              console.log(`[Pipedrive Sync] Created ${newLeads.length} new leads from Pipedrive deals`)
+            if (!insertError) {
+              // Log creation events
+              const { data: createdLeads } = await admin
+                .from('leads')
+                .select('id, email, first_name, company, source')
+                .eq('org_id', orgId)
+                .in('email', newLeads.map(l => l.email).filter(Boolean))
 
-              // Log events for newly created leads
-              try {
-                const { data: createdLeads } = await admin
-                  .from('leads')
-                  .select('id, email, first_name, company, source')
-                  .eq('org_id', orgId)
-                  .in('email', newLeads.map(l => l.email).filter(Boolean))
-
-                if (createdLeads && createdLeads.length > 0) {
-                  const events = createdLeads.map(l => ({
+              if (createdLeads) {
+                for (const l of createdLeads) {
+                  events.push({
                     org_id: orgId,
                     lead_id: l.id,
                     event_type: 'custom',
                     title: 'Lead criado via Pipedrive Sync',
                     description: `${l.first_name || ''} — ${l.company || l.source || 'Pipedrive'}`,
                     metadata: { action: 'create', source: l.source, webhook_source: 'pipedrive_sync' },
-                  }))
-                  // Batch insert events (max 100 to avoid payload limits)
-                  for (let e = 0; e < events.length; e += 100) {
-                    await admin.from('lead_events').insert(events.slice(e, e + 100))
-                  }
+                  })
                 }
-              } catch { /* non-fatal */ }
+              }
             }
           }
+
+          // Batch insert all events
+          if (events.length > 0) {
+            for (let e = 0; e < events.length; e += 100) {
+              try { await admin.from('lead_events').insert(events.slice(e, e + 100)) } catch { /* non-fatal */ }
+            }
+          }
+
+          console.log(`[Pipedrive Sync] Leads: ${newLeads.length} criados, ${updatedCount} atualizados, ${events.length} eventos`)
         }
-      } catch (leadCreateError) {
-        console.warn('[Pipedrive Sync] Auto lead creation error (non-fatal):', leadCreateError)
+      } catch (leadSyncError) {
+        console.warn('[Pipedrive Sync] Auto lead sync error (non-fatal):', leadSyncError)
       }
     }
 
@@ -256,7 +307,7 @@ async function syncPipedrive(
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
-                    'x-internal-key': (process.env.SUPABASE_SERVICE_ROLE_KEY || '').slice(0, 20),
+                    'x-internal-key': process.env.INTERNAL_API_SECRET || '',
                   },
                   body: JSON.stringify({ leadId: lead.id }),
                 }).catch(() => {}) // ignore errors — this is fire-and-forget

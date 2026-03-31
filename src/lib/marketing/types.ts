@@ -269,6 +269,7 @@ export interface BrandIdentity {
   brand_promise?: string
   tagline_suggestions?: string[]
   fonts?: string[]
+  logo_url?: string
   logo_description?: string
   style_guide_url?: string
 }

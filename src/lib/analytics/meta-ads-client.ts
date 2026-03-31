@@ -97,8 +97,9 @@ export async function getAdSets(config: MetaAdsConfig) {
 export async function getAds(config: MetaAdsConfig) {
   const queryParams = new URLSearchParams({
     access_token: config.access_token,
-    fields: 'id,name,campaign_id,adset_id,status,effective_status,creative{id,name,title,body,call_to_action_type,image_url,thumbnail_url,video_id,link_url,object_story_spec}',
-    limit: '500',
+    fields: 'id,name,campaign_id,adset_id,status,effective_status,creative{id,image_url,thumbnail_url}',
+    limit: '200',
+    filtering: JSON.stringify([{ field: 'effective_status', operator: 'IN', value: ['ACTIVE', 'PAUSED'] }]),
   })
 
   return fetchAllPages(
