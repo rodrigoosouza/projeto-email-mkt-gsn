@@ -111,6 +111,17 @@ export default function GrowthAnalysisPage() {
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [dateFilter, setDateFilter] = useState<DateFilter>('30d')
+  const [sortConfig, setSortConfig] = useState<{ key: string; dir: 'asc' | 'desc' }>({ key: 'leads', dir: 'desc' })
+  const toggleSort = (key: string) => setSortConfig(prev => ({ key, dir: prev.key === key && prev.dir === 'desc' ? 'asc' : 'desc' }))
+  const sortFn = (a: any, b: any) => {
+    const av = Number(a[sortConfig.key]) || 0, bv = Number(b[sortConfig.key]) || 0
+    return sortConfig.dir === 'desc' ? bv - av : av - bv
+  }
+  const SortHead = ({ label, field, className }: { label: string; field: string; className?: string }) => (
+    <TableHead className={cn('text-xs cursor-pointer hover:text-foreground select-none', className)} onClick={() => toggleSort(field)}>
+      {label} {sortConfig.key === field ? (sortConfig.dir === 'desc' ? '↓' : '↑') : ''}
+    </TableHead>
+  )
   const [ga4Data, setGa4Data] = useState<any>(null)
   const [ga4Loading, setGa4Loading] = useState(false)
   const [ga4Error, setGa4Error] = useState<string | null>(null)
@@ -120,14 +131,25 @@ export default function GrowthAnalysisPage() {
     setLoading(true)
     try {
       const sb = createClient()
+      // Get pipeline_name from pipedrive_connections for this org
+      const { data: pipeConn } = await sb.from('pipedrive_connections').select('pipeline_name').eq('org_id', orgId).eq('status', 'active').single()
+      const pipelineName = pipeConn?.pipeline_name || null
+
+      let dealsQuery = sb.from('pipedrive_deals').select('deal_id,title,value,currency,status,stage_id,stage_name,pipeline_name,person_name,person_email,org_name,owner_name,add_time,update_time,won_time,lost_time,lost_reason,utm_source,utm_medium,utm_campaign,utm_content,utm_term').eq('org_id', orgId).order('add_time', { ascending: false }).range(0, 999)
+      let stagesQuery = sb.from('pipedrive_stages').select('stage_id,name,order_nr,pipeline_name').eq('org_id', orgId).order('order_nr', { ascending: true })
+      if (pipelineName) {
+        dealsQuery = dealsQuery.eq('pipeline_name', pipelineName)
+        stagesQuery = stagesQuery.eq('pipeline_name', pipelineName)
+      }
+
       const [c, ai, asi, am, asm, d, s] = await Promise.all([
         sb.from('meta_campaign_insights').select('id,campaign_id,campaign_name,date,impressions,reach,clicks,link_clicks,spend,cpc,cpm,ctr,leads,cost_per_lead,frequency').eq('org_id', orgId).order('date', { ascending: false }).range(0, 999),
         sb.from('meta_ad_insights').select('id,ad_id,date,impressions,reach,clicks,link_clicks,spend,cpc,cpm,ctr,conversions,leads,actions').eq('org_id', orgId).range(0, 999),
         sb.from('meta_adset_insights').select('id,adset_id,date,impressions,reach,clicks,link_clicks,spend,cpc,cpm,ctr,leads').eq('org_id', orgId).range(0, 999),
         sb.from('meta_ads').select('id,ad_id,adset_id,campaign_id,name,status,image_url,headline').eq('org_id', orgId).range(0, 999),
         sb.from('meta_adsets').select('id,adset_id,campaign_id,name,status,targeting').eq('org_id', orgId).range(0, 999),
-        sb.from('pipedrive_deals').select('deal_id,title,value,currency,status,stage_id,stage_name,pipeline_name,person_name,person_email,org_name,owner_name,add_time,update_time,won_time,lost_time,lost_reason,utm_source,utm_medium,utm_campaign,utm_content,utm_term').eq('org_id', orgId).order('add_time', { ascending: false }).range(0, 999),
-        sb.from('pipedrive_stages').select('stage_id,name,order_nr,pipeline_name').eq('org_id', orgId).order('order_nr', { ascending: true }),
+        dealsQuery,
+        stagesQuery,
       ])
       if (c.error) console.error('campaign_insights error:', c.error)
       if (ai.error) console.error('ad_insights error:', ai.error)
@@ -455,15 +477,19 @@ export default function GrowthAnalysisPage() {
                   <TableHeader>
                     <TableRow className="bg-muted/30">
                       <TableHead className="w-[50px] pl-4"></TableHead><TableHead className="text-xs">Criativo</TableHead>
-                      <TableHead className="text-right text-xs">Leads</TableHead><TableHead className="text-right text-xs">Vendas</TableHead><TableHead className="text-right text-xs">Receita</TableHead><TableHead className="text-right text-xs">CPL</TableHead>
-                      <TableHead className="text-right text-xs">Conv.</TableHead>
-                      <TableHead className="text-right text-xs">Invest.</TableHead><TableHead className="text-right text-xs">Cliques</TableHead><TableHead className="text-right text-xs pr-4">CTR</TableHead>
+                      <SortHead label="Leads" field="leads" className="text-right" /><SortHead label="Vendas" field="won" className="text-right" /><SortHead label="Receita" field="wonValue" className="text-right" /><SortHead label="CPL" field="cpl" className="text-right" />
+                      <SortHead label="Conv." field="conv" className="text-right" />
+                      <SortHead label="Invest." field="spend" className="text-right" /><SortHead label="Cliques" field="clicks" className="text-right" /><SortHead label="CTR" field="ctr" className="text-right pr-4" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {topCreatives.filter(c=>c.leads>0).slice(0,15).map((c, i) => {
+                    {topCreatives.filter(c=>c.leads>0).map(c => {
                       const ctr = c.imp>0?(c.clicks/c.imp)*100:0, cpl = c.leads>0?c.spend/c.leads:0, conv = c.clicks>0?(c.leads/c.clicks)*100:0
                       const crmData = wonByCreative.get(c.name) || { won: 0, value: 0 }
+                      return { ...c, won: crmData.won, wonValue: crmData.value, cpl, conv, ctr }
+                    }).sort(sortFn).slice(0,15).map((c, i) => {
+                      const { ctr, cpl, conv } = c
+                      const crmData = { won: c.won, value: c.wonValue }
                       const isVideo = c.name?.toLowerCase().includes('video')
                       const isTop3 = i < 3
                       return (
@@ -528,15 +554,20 @@ export default function GrowthAnalysisPage() {
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader><TableRow className="bg-muted/30">
-                    <TableHead className="text-xs pl-4 min-w-[350px]">Publico</TableHead><TableHead className="text-right text-xs">Leads</TableHead>
-                    <TableHead className="text-right text-xs">Vendas</TableHead><TableHead className="text-right text-xs">Receita</TableHead>
-                    <TableHead className="text-right text-xs">CPL</TableHead><TableHead className="text-right text-xs">Conv.</TableHead>
-                    <TableHead className="text-right text-xs">Invest.</TableHead><TableHead className="text-right text-xs pr-4">CTR</TableHead>
+                    <TableHead className="text-xs pl-4 min-w-[350px]">Publico</TableHead>
+                    <SortHead label="Leads" field="leads" className="text-right" />
+                    <SortHead label="Vendas" field="won" className="text-right" /><SortHead label="Receita" field="wonValue" className="text-right" />
+                    <SortHead label="CPL" field="cpl" className="text-right" /><SortHead label="Conv." field="conv" className="text-right" />
+                    <SortHead label="Invest." field="spend" className="text-right" /><SortHead label="CTR" field="ctr" className="text-right pr-4" />
                   </TableRow></TableHeader>
                   <TableBody>
-                    {topAudiences.filter(a=>a.leads>0).slice(0,15).map(a => {
+                    {topAudiences.filter(a=>a.leads>0).map(a => {
                       const cpl=a.leads>0?a.spend/a.leads:0, ctr=a.imp>0?(a.clicks/a.imp)*100:0, conv=a.clicks>0?(a.leads/a.clicks)*100:0
                       const audCrm = wonByAudience.get(a.name) || { won: 0, value: 0 }
+                      return { ...a, won: audCrm.won, wonValue: audCrm.value, cpl, conv, ctr }
+                    }).sort(sortFn).slice(0,15).map(a => {
+                      const { cpl, ctr, conv } = a
+                      const audCrm = { won: a.won, value: a.wonValue }
                       const isRmk=a.name?.toLowerCase().includes('remarketing'), isLAL=a.name?.toLowerCase().includes('lookalike')
                       return (
                         <TableRow key={a.name}>
@@ -571,41 +602,40 @@ export default function GrowthAnalysisPage() {
                   <TableHeader>
                     <TableRow className="bg-muted/30">
                       <TableHead className="text-xs pl-4 min-w-[300px]">Campanha</TableHead>
-                      <TableHead className="text-right text-xs">Leads</TableHead>
-                      <TableHead className="text-right text-xs">Vendas</TableHead>
-                      <TableHead className="text-right text-xs">Receita</TableHead>
-                      <TableHead className="text-right text-xs">ROAS</TableHead>
-                      <TableHead className="text-right text-xs">CPL</TableHead>
-                      <TableHead className="text-right text-xs">Conv.</TableHead>
-                      <TableHead className="text-right text-xs">Invest.</TableHead>
-                      <TableHead className="text-right text-xs">Cliques</TableHead>
-                      <TableHead className="text-right text-xs pr-4">CTR</TableHead>
+                      <SortHead label="Leads" field="leads" className="text-right" />
+                      <SortHead label="Vendas" field="won" className="text-right" />
+                      <SortHead label="Receita" field="wonValue" className="text-right" />
+                      <SortHead label="ROAS" field="roas" className="text-right" />
+                      <SortHead label="CPL" field="cpl" className="text-right" />
+                      <SortHead label="Conv." field="conv" className="text-right" />
+                      <SortHead label="Invest." field="spend" className="text-right" />
+                      <SortHead label="Cliques" field="clicks" className="text-right" />
+                      <SortHead label="CTR" field="ctr" className="text-right pr-4" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {campaignStats.filter(c => c.leads > 0 || c.won > 0).map((c, i) => {
+                    {campaignStats.filter(c => c.leads > 0 || c.won > 0).map(c => {
                       const ctr = c.imp > 0 ? (c.clicks / c.imp) * 100 : 0
                       const cpl = c.leads > 0 ? c.spend / c.leads : 0
                       const conv = c.clicks > 0 ? (c.leads / c.clicks) * 100 : 0
-                      const campaignRoas = c.spend > 0 ? c.wonValue / c.spend : 0
-                      const isTop = c.won > 0
-                      return (
-                        <TableRow key={c.name} className={cn(isTop && 'bg-emerald-50/50 dark:bg-emerald-950/10')}>
+                      const roas = c.spend > 0 ? c.wonValue / c.spend : 0
+                      return { ...c, ctr, cpl, conv, roas }
+                    }).sort(sortFn).map((c, i) => (
+                        <TableRow key={c.name} className={cn(c.won > 0 && 'bg-emerald-50/50 dark:bg-emerald-950/10')}>
                           <TableCell className="pl-4">
                             <span className="text-sm break-words max-w-[300px] block">{c.name}</span>
                           </TableCell>
                           <TableCell className="text-right"><span className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">{c.leads}</span></TableCell>
                           <TableCell className="text-right">{c.won > 0 ? <span className="font-bold text-green-600 dark:text-green-400 text-sm">{c.won}</span> : <span className="text-muted-foreground text-sm">-</span>}</TableCell>
                           <TableCell className="text-right">{c.wonValue > 0 ? <span className="text-sm font-medium text-green-600 dark:text-green-400">{fmt$(c.wonValue)}</span> : <span className="text-muted-foreground text-sm">-</span>}</TableCell>
-                          <TableCell className="text-right">{campaignRoas > 0 ? <span className={cn('text-xs font-semibold px-1.5 py-0.5 rounded', campaignRoas >= 3 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : campaignRoas >= 1 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700')}>{campaignRoas.toFixed(1)}x</span> : <span className="text-muted-foreground text-sm">-</span>}</TableCell>
-                          <TableCell className="text-right text-sm">{fmt$(cpl)}</TableCell>
-                          <TableCell className="text-right"><span className={cn('text-xs font-semibold px-1.5 py-0.5 rounded', conv > mkt.convRate ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'text-muted-foreground')}>{fmtP(conv)}</span></TableCell>
+                          <TableCell className="text-right">{c.roas > 0 ? <span className={cn('text-xs font-semibold px-1.5 py-0.5 rounded', c.roas >= 3 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : c.roas >= 1 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700')}>{c.roas.toFixed(1)}x</span> : <span className="text-muted-foreground text-sm">-</span>}</TableCell>
+                          <TableCell className="text-right text-sm">{fmt$(c.cpl)}</TableCell>
+                          <TableCell className="text-right"><span className={cn('text-xs font-semibold px-1.5 py-0.5 rounded', c.conv > mkt.convRate ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'text-muted-foreground')}>{fmtP(c.conv)}</span></TableCell>
                           <TableCell className="text-right text-sm text-muted-foreground">{fmt$(c.spend)}</TableCell>
                           <TableCell className="text-right text-sm text-muted-foreground">{fmtN(c.clicks)}</TableCell>
-                          <TableCell className="text-right text-sm text-muted-foreground pr-4">{fmtP(ctr)}</TableCell>
+                          <TableCell className="text-right text-sm text-muted-foreground pr-4">{fmtP(c.ctr)}</TableCell>
                         </TableRow>
-                      )
-                    })}
+                    ))}
                   </TableBody>
                 </Table>
               </div>

@@ -5,6 +5,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   PipedriveConfig,
   getDeals,
+  getPipelines,
   getStages,
   extractPersonEmail,
   extractPersonPhone,
@@ -78,6 +79,13 @@ async function syncPipedrive(
       const stageMap = new Map<number, string>()
       stagesData?.forEach((s: any) => stageMap.set(s.stage_id, s.name))
 
+      // Load pipeline names from Pipedrive API for real pipeline_name per deal
+      const pipelineMap = new Map<number, string>()
+      try {
+        const pipelines = await getPipelines(config)
+        pipelines.forEach((p: any) => pipelineMap.set(p.id, p.name))
+      } catch { /* fallback to connection.pipeline_name below */ }
+
       for (const deal of deals) {
         const personEmail = extractPersonEmail(deal)
         const personPhone = extractPersonPhone(deal)
@@ -96,7 +104,7 @@ async function syncPipedrive(
             stage_id: deal.stage_id,
             stage_name: stageMap.get(deal.stage_id) || deal.stage_order_nr?.toString() || null,
             pipeline_id: deal.pipeline_id,
-            pipeline_name: connection.pipeline_name || null,
+            pipeline_name: pipelineMap.get(deal.pipeline_id) || connection.pipeline_name || null,
             person_id: deal.person_id?.value || deal.person_id || null,
             person_name: personName,
             person_email: personEmail,
