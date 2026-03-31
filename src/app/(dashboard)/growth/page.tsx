@@ -299,10 +299,22 @@ export default function GrowthAnalysisPage() {
       e.spend += Number(c.spend); e.imp += Number(c.impressions); e.clicks += Number(c.clicks); e.leads += Number(c.leads)
       map.set(name, e)
     })
-    // Cross with CRM deals by utm_campaign
+    // Cross with CRM deals by utm_campaign (fuzzy match — handles "— Cópia" suffix)
+    const campaignNames = Array.from(map.keys())
     deals.forEach((d: any) => {
       if (!d.utm_campaign) return
-      const e = map.get(d.utm_campaign)
+      // Try exact match first
+      let e = map.get(d.utm_campaign)
+      // If no exact match, try fuzzy: remove "— Cópia", "- Copia", trailing suffixes
+      if (!e) {
+        const cleanDealCampaign = d.utm_campaign.replace(/\s*[—–-]\s*(C[oó]pia|Copy)\s*\d*$/i, '').trim()
+        e = map.get(cleanDealCampaign)
+        // Still no match? Try if any campaign name starts with the same base
+        if (!e) {
+          const match = campaignNames.find(name => cleanDealCampaign.startsWith(name) || name.startsWith(cleanDealCampaign))
+          if (match) e = map.get(match)
+        }
+      }
       if (e) {
         if (d.status === 'won') { e.won++; e.wonValue += Number(d.value || 0) }
         if (d.status === 'lost') e.lost++
