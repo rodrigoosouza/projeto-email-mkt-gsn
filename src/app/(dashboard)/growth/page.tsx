@@ -326,13 +326,16 @@ export default function GrowthAnalysisPage() {
   // === CRIATIVOS NO CRM ===
   const wonDealsAll = useMemo(() => {
     return fWonDeals.map((d: any) => {
-      let source = 'Direto / Sem rastreio'
+      let source = 'Fonte desconhecida'
       if (d.utm_source === 'facebook') source = 'Meta Ads'
       else if (d.utm_source === 'google') source = 'Google Ads'
       else if (d.utm_source === 'ig') source = 'Instagram'
       else if (d.utm_source === 'manychat') source = 'ManyChat'
       else if (d.utm_source) source = d.utm_source
-      return { title: d.title, personName: d.person_name, value: Number(d.value || 0), wonTime: d.won_time, utmTerm: d.utm_term, utmContent: d.utm_content, utmSource: d.utm_source, source }
+      const criativo = d.utm_term || 'Sem criativo'
+      const publico = d.utm_content || 'Sem publico'
+      const campanha = d.utm_campaign ? d.utm_campaign.replace(/\s*[—–-]\s*(C[oó]pia|Copy)\s*\d*$/i, '').trim() : 'Sem campanha'
+      return { title: d.title, personName: d.person_name, value: Number(d.value || 0), wonTime: d.won_time, utmTerm: d.utm_term, utmContent: d.utm_content, utmSource: d.utm_source, utmCampaign: campanha, source, criativo, publico }
     }).sort((a: any, b: any) => (b.wonTime || '').localeCompare(a.wonTime || ''))
   }, [fWonDeals])
 
@@ -700,6 +703,7 @@ export default function GrowthAnalysisPage() {
                       <TableHead className="text-xs pl-4">Cliente</TableHead>
                       <TableHead className="text-right text-xs">Valor</TableHead>
                       <TableHead className="text-xs">Fonte</TableHead>
+                      <TableHead className="text-xs">Campanha</TableHead>
                       <TableHead className="text-xs">Criativo</TableHead>
                       <TableHead className="text-xs">Publico</TableHead>
                       <TableHead className="text-xs pr-4">Data</TableHead>
@@ -724,8 +728,9 @@ export default function GrowthAnalysisPage() {
                               'border-gray-300 text-gray-500'
                             )}>{d.source}</Badge>
                           </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{d.utmTerm || '-'}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground truncate max-w-[150px]">{d.utmContent || '-'}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground truncate max-w-[180px]" title={d.utmCampaign}>{d.utmCampaign || '-'}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground truncate max-w-[150px]" title={d.criativo}>{d.criativo || '-'}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground truncate max-w-[150px]" title={d.publico}>{d.publico || '-'}</TableCell>
                           <TableCell className="text-xs text-muted-foreground pr-4 whitespace-nowrap">{d.wonTime ? new Date(d.wonTime).toLocaleDateString('pt-BR') : '-'}</TableCell>
                         </TableRow>
                       ))}
