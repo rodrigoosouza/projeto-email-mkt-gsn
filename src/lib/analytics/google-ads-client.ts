@@ -140,6 +140,89 @@ async function googleAdsPost(
   return data
 }
 
+// ─── GAQL Reporting ─────────────────────────────────────────────────────────
+
+export async function searchGoogleAds(config: GoogleAdsConfig, query: string): Promise<any[]> {
+  const customerId = stripDashes(config.customer_id)
+  const url = `${GOOGLE_ADS_API_BASE}/customers/${customerId}/googleAds:searchStream`
+  const data = await googleAdsPost(url, buildHeaders(config), { query })
+  // searchStream returns array of batches, each with results
+  const allResults: any[] = []
+  if (Array.isArray(data)) {
+    for (const batch of data) {
+      if (batch.results) allResults.push(...batch.results)
+    }
+  } else if (data?.results) {
+    allResults.push(...data.results)
+  }
+  return allResults
+}
+
+export async function getCampaignInsightsDaily(
+  config: GoogleAdsConfig,
+  since: string, // YYYY-MM-DD
+  until: string  // YYYY-MM-DD
+): Promise<any[]> {
+  const query = `
+    SELECT campaign.id, campaign.name, campaign.status,
+           segments.date,
+           metrics.impressions, metrics.clicks, metrics.cost_micros,
+           metrics.conversions, metrics.cost_per_conversion,
+           metrics.ctr, metrics.average_cpc, metrics.average_cpm,
+           metrics.all_conversions, metrics.view_through_conversions,
+           metrics.interactions, metrics.interaction_rate,
+           metrics.search_impression_share
+    FROM campaign
+    WHERE segments.date BETWEEN '${since}' AND '${until}'
+      AND campaign.status != 'REMOVED'
+  `
+  return searchGoogleAds(config, query)
+}
+
+export async function getAdGroupInsightsDaily(
+  config: GoogleAdsConfig,
+  since: string,
+  until: string
+): Promise<any[]> {
+  const query = `
+    SELECT ad_group.id, ad_group.name, ad_group.campaign,
+           campaign.id, segments.date,
+           metrics.impressions, metrics.clicks, metrics.cost_micros,
+           metrics.conversions, metrics.ctr, metrics.average_cpc
+    FROM ad_group
+    WHERE segments.date BETWEEN '${since}' AND '${until}'
+      AND ad_group.status != 'REMOVED'
+  `
+  return searchGoogleAds(config, query)
+}
+
+export async function getAdInsightsDaily(
+  config: GoogleAdsConfig,
+  since: string,
+  until: string
+): Promise<any[]> {
+  const query = `
+    SELECT ad_group_ad.ad.id, ad_group_ad.ad.name,
+           ad_group.id, campaign.id, segments.date,
+           metrics.impressions, metrics.clicks, metrics.cost_micros,
+           metrics.conversions, metrics.ctr, metrics.average_cpc
+    FROM ad_group_ad
+    WHERE segments.date BETWEEN '${since}' AND '${until}'
+      AND ad_group_ad.status != 'REMOVED'
+  `
+  return searchGoogleAds(config, query)
+}
+
+export async function getAdGroupsMetadata(config: GoogleAdsConfig): Promise<any[]> {
+  const query = `
+    SELECT ad_group.id, ad_group.name, ad_group.status,
+           ad_group.cpc_bid_micros, campaign.id
+    FROM ad_group
+    WHERE ad_group.status != 'REMOVED'
+  `
+  return searchGoogleAds(config, query)
+}
+
 // ─── Campaign Budget ─────────────────────────────────────────────────────────
 
 export async function createCampaignBudget(
