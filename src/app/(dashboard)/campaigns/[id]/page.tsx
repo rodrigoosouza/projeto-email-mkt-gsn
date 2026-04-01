@@ -22,6 +22,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
 import {
   Dialog,
   DialogContent,
@@ -97,6 +98,8 @@ export default function CampaignDetailPage() {
   const [scheduling, setScheduling] = useState(false)
   const [sending, setSending] = useState(false)
   const [pausing, setPausing] = useState(false)
+  const [apiQuota, setApiQuota] = useState<{ quota: number; remaining: number; reset: string } | null>(null)
+  const [sendProgress, setSendProgress] = useState<{ sent: number; failed: number; pending: number; total: number } | null>(null)
 
   const fetchCampaign = useCallback(async () => {
     try {
@@ -128,10 +131,29 @@ export default function CampaignDetailPage() {
     try {
       const { logs } = await getCampaignSendLogs(campaignId)
       setSendLogs(logs)
+      // Calculate progress from logs
+      if (logs.length > 0) {
+        const sent = logs.filter(l => l.status === 'sent' || l.status === 'delivered' || l.status === 'opened' || l.status === 'clicked').length
+        const failed = logs.filter(l => l.status === 'bounced' || l.status === 'complained').length
+        const pending = logs.filter(l => l.status === 'pending').length
+        setSendProgress({ sent, failed, pending, total: logs.length })
+      }
     } catch (error) {
       console.error('Erro ao buscar logs de envio:', error)
     }
   }, [campaignId])
+
+  const fetchApiQuota = useCallback(async () => {
+    try {
+      const res = await fetch('/api/mailersend/quota')
+      if (res.ok) {
+        const data = await res.json()
+        setApiQuota(data)
+      }
+    } catch (error) {
+      console.error('Erro ao buscar quota:', error)
+    }
+  }, [])
 
   useEffect(() => {
     async function load() {
@@ -147,10 +169,20 @@ export default function CampaignDetailPage() {
           await Promise.all([fetchStats(), fetchSendLogs()])
         }
       }
+      fetchApiQuota()
       setLoading(false)
     }
     load()
-  }, [fetchCampaign, fetchStats, fetchSendLogs])
+  }, [fetchCampaign, fetchStats, fetchSendLogs, fetchApiQuota])
+
+  // Polling during sending
+  useEffect(() => {
+    if (campaign?.status !== 'sending') return
+    const interval = setInterval(async () => {
+      await Promise.all([fetchCampaign(), fetchStats(), fetchSendLogs(), fetchApiQuota()])
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [campaign?.status, fetchCampaign, fetchStats, fetchSendLogs, fetchApiQuota])
 
   const handleDelete = async () => {
     setDeleting(true)
@@ -532,6 +564,82 @@ export default function CampaignDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Send Progress + API Quota */}
+      {(campaign.status === 'sending' || campaign.status === 'sent' || campaign.status === 'failed') && sendProgress && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              {campaign.status === 'sending' && <span className="relative flex h-2.5 w-2.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" /><span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500" /></span>}
+              Progresso do Disparo
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <div className="flex justify-between text-sm mb-1.5">
+                <span className="text-muted-foreground">
+                  {sendProgress.sent + sendProgress.failed} de {sendProgress.total} processados
+                </span>
+                <span className="font-medium">
+                  {sendProgress.total > 0 ? Math.round(((sendProgress.sent + sendProgress.failed) / sendProgress.total) * 100) : 0}%
+                </span>
+              </div>
+              <Progress value={sendProgress.total > 0 ? ((sendProgress.sent + sendProgress.failed) / sendProgress.total) * 100 : 0} className="h-3" />
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="text-center p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30">
+                <p className="text-xl font-bold text-emerald-600">{sendProgress.sent}</p>
+                <p className="text-[11px] text-muted-foreground">Enviados</p>
+              </div>
+              <div className="text-center p-2.5 rounded-lg bg-red-50 dark:bg-red-950/30">
+                <p className="text-xl font-bold text-red-600">{sendProgress.failed}</p>
+                <p className="text-[11px] text-muted-foreground">Falharam</p>
+              </div>
+              <div className="text-center p-2.5 rounded-lg bg-blue-50 dark:bg-blue-950/30">
+                <p className="text-xl font-bold text-blue-600">{sendProgress.pending}</p>
+                <p className="text-[11px] text-muted-foreground">Pendentes</p>
+              </div>
+              <div className="text-center p-2.5 rounded-lg bg-gray-50 dark:bg-gray-950/30">
+                <p className="text-xl font-bold">{sendProgress.total}</p>
+                <p className="text-[11px] text-muted-foreground">Total</p>
+              </div>
+            </div>
+            {apiQuota && (
+              <div className="border-t pt-3 mt-3">
+                <p className="text-xs font-medium text-muted-foreground mb-2">Quota MailerSend</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <div>
+                    <p className="text-sm font-semibold">{apiQuota.remaining.toLocaleString('pt-BR')}</p>
+                    <p className="text-[11px] text-muted-foreground">Restantes no mes</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">{apiQuota.quota.toLocaleString('pt-BR')}</p>
+                    <p className="text-[11px] text-muted-foreground">Quota mensal</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">{new Date(apiQuota.reset).toLocaleDateString('pt-BR')}</p>
+                    <p className="text-[11px] text-muted-foreground">Reset</p>
+                  </div>
+                </div>
+                <Progress value={((apiQuota.quota - apiQuota.remaining) / apiQuota.quota) * 100} className="h-1.5 mt-2" />
+                <p className="text-[10px] text-muted-foreground mt-1">{((apiQuota.quota - apiQuota.remaining) / apiQuota.quota * 100).toFixed(1)}% utilizado</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* API Quota (when not sending) */}
+      {campaign.status === 'draft' && apiQuota && (
+        <Card>
+          <CardContent className="py-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Quota MailerSend:</span>
+              <span className="font-medium">{apiQuota.remaining.toLocaleString('pt-BR')} / {apiQuota.quota.toLocaleString('pt-BR')} emails restantes</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats Cards */}
       {showStats && stats && (
