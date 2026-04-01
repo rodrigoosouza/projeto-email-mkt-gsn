@@ -658,13 +658,16 @@ export default function GrowthAnalysisPage() {
                 <Table>
                   <TableHeader><TableRow className="bg-muted/30">
                     <TableHead className="w-[50px] pl-4"></TableHead><TableHead className="text-xs">Criativo</TableHead>
-                    <TableHead className="text-right text-xs">Deals</TableHead><TableHead className="text-right text-xs">Abertos</TableHead>
-                    <TableHead className="text-right text-xs">Ganhos</TableHead><TableHead className="text-right text-xs">Perdidos</TableHead>
-                    <TableHead className="text-right text-xs">Win Rate</TableHead><TableHead className="text-right text-xs pr-4">Valor</TableHead>
+                    <SortHead label="Deals" field="deals" className="text-right" /><SortHead label="Abertos" field="open" className="text-right" />
+                    <SortHead label="Ganhos" field="won" className="text-right" /><SortHead label="Perdidos" field="lost" className="text-right" />
+                    <SortHead label="Win Rate" field="wr" className="text-right" /><SortHead label="Valor" field="wonValue" className="text-right pr-4" />
                   </TableRow></TableHeader>
                   <TableBody>
-                    {creativesInCRM.slice(0,15).map((c, i) => {
+                    {creativesInCRM.map(c => {
                       const wr = (c.won+c.lost)>0?(c.won/(c.won+c.lost))*100:0
+                      return { ...c, wr }
+                    }).sort(sortFn).slice(0,15).map((c, i) => {
+                      const wr = c.wr
                       const meta = adsMeta.find(a=>a.name===c.name)
                       const isVideo = c.name?.toLowerCase().includes('video')
                       return (
@@ -695,13 +698,17 @@ export default function GrowthAnalysisPage() {
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader><TableRow className="bg-muted/30">
-                    <TableHead className="text-xs pl-4 min-w-[350px]">Publico / Conjunto</TableHead><TableHead className="text-right text-xs">Deals</TableHead>
-                    <TableHead className="text-right text-xs">Abertos</TableHead><TableHead className="text-right text-xs">Ganhos</TableHead>
-                    <TableHead className="text-right text-xs">Perdidos</TableHead><TableHead className="text-right text-xs pr-4">Win Rate</TableHead>
+                    <TableHead className="text-xs pl-4 min-w-[350px]">Publico / Conjunto</TableHead>
+                    <SortHead label="Deals" field="deals" className="text-right" />
+                    <SortHead label="Abertos" field="open" className="text-right" /><SortHead label="Ganhos" field="won" className="text-right" />
+                    <SortHead label="Perdidos" field="lost" className="text-right" /><SortHead label="Win Rate" field="wr" className="text-right pr-4" />
                   </TableRow></TableHeader>
                   <TableBody>
-                    {audiencesInCRM.slice(0,15).map(a => {
+                    {audiencesInCRM.map(a => {
                       const wr = (a.won+a.lost)>0?(a.won/(a.won+a.lost))*100:0
+                      return { ...a, wr }
+                    }).sort(sortFn).slice(0,15).map(a => {
+                      const wr = a.wr
                       const isRmk=a.name?.toLowerCase().includes('remarketing'), isLAL=a.name?.toLowerCase().includes('lookalike')
                       return (
                         <TableRow key={a.name}>
