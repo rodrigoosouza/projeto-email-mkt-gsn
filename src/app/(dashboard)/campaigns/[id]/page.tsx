@@ -100,6 +100,7 @@ export default function CampaignDetailPage() {
   const [scheduling, setScheduling] = useState(false)
   const [sending, setSending] = useState(false)
   const [pausing, setPausing] = useState(false)
+  const [logFilter, setLogFilter] = useState('all')
   const [apiQuota, setApiQuota] = useState<{ quota: number; remaining: number; reset: string } | null>(null)
   const [sendProgress, setSendProgress] = useState<{ sent: number; failed: number; pending: number; total: number } | null>(null)
 
@@ -131,7 +132,7 @@ export default function CampaignDetailPage() {
 
   const fetchSendLogs = useCallback(async () => {
     try {
-      const { logs } = await getCampaignSendLogs(campaignId)
+      const { logs } = await getCampaignSendLogs(campaignId, { pageSize: 2000 })
       setSendLogs(logs)
       // Calculate progress from logs
       if (logs.length > 0) {
@@ -643,85 +644,121 @@ export default function CampaignDetailPage() {
         </Card>
       )}
 
-      {/* Stats Cards */}
-      {showStats && stats && (
-        <div>
-          <h3 className="text-lg font-semibold mb-4">Estatisticas</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            <KpiCard
-              icon={Mail}
-              label="Enviados"
-              value={stats.total_sent}
-            />
-            <KpiCard
-              icon={CheckCircle2}
-              label="Entregues"
-              value={`${stats.total_delivered} (${getPercentage(stats.total_delivered, stats.total_sent)})`}
-            />
-            <KpiCard
-              icon={Eye}
-              label="Abertos"
-              value={`${stats.total_opened} (${getPercentage(stats.total_opened, stats.total_sent)})`}
-            />
-            <KpiCard
-              icon={MousePointerClick}
-              label="Clicados"
-              value={`${stats.total_clicked} (${getPercentage(stats.total_clicked, stats.total_sent)})`}
-            />
-            <KpiCard
-              icon={AlertTriangle}
-              label="Bounces"
-              value={stats.total_bounced}
-            />
-            <KpiCard
-              icon={ShieldAlert}
-              label="Reclamacoes"
-              value={stats.total_complained}
-            />
-          </div>
-        </div>
-      )}
+      {/* Stats + Logs */}
+      {showStats && sendLogs.length > 0 && (() => {
+        const counts: Record<string, number> = {}
+        sendLogs.forEach(l => { counts[l.status] = (counts[l.status] || 0) + 1 })
+        const successStatuses = ['sent', 'delivered', 'opened', 'clicked']
+        const totalSuccess = sendLogs.filter(l => successStatuses.includes(l.status)).length
+        const totalFailed = counts['failed'] || 0
+        const totalBounced = counts['bounced'] || 0
+        const totalPending = counts['pending'] || 0
+        const delivered = counts['delivered'] || 0
+        const opened = counts['opened'] || 0
+        const clicked = counts['clicked'] || 0
+        const complained = counts['complained'] || 0
 
-      {/* Send Logs Table */}
-      {showStats && sendLogs.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Logs de Envio</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Enviado em</TableHead>
-                  <TableHead>Entregue em</TableHead>
-                  <TableHead>Aberto em</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sendLogs.map((log) => (
-                  <TableRow key={log.id}>
-                    <TableCell className="font-medium">{log.email}</TableCell>
-                    <TableCell>
-                      <Badge
-                        className={
-                          SEND_LOG_STATUS_COLORS[log.status] ||
-                          'bg-gray-100 text-gray-800'
-                        }
-                      >
-                        {SEND_LOG_STATUS_LABELS[log.status] || log.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{formatDate(log.sent_at)}</TableCell>
-                    <TableCell>{formatDate(log.delivered_at)}</TableCell>
-                    <TableCell>{formatDate(log.opened_at)}</TableCell>
-                  </TableRow>
+        const filterButtons = [
+          { key: 'all', label: 'Todos', count: sendLogs.length, color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' },
+          { key: 'success', label: 'Enviados', count: totalSuccess, color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' },
+          { key: 'delivered', label: 'Entregues', count: delivered, color: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400' },
+          { key: 'opened', label: 'Abertos', count: opened, color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-400' },
+          { key: 'clicked', label: 'Clicados', count: clicked, color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400' },
+          { key: 'bounced', label: 'Bounces', count: totalBounced, color: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400' },
+          { key: 'failed', label: 'Erros', count: totalFailed, color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' },
+          { key: 'pending', label: 'Pendentes', count: totalPending, color: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400' },
+        ].filter(b => b.count > 0 || b.key === 'all')
+
+        const filteredLogs = logFilter === 'all' ? sendLogs
+          : logFilter === 'success' ? sendLogs.filter(l => successStatuses.includes(l.status))
+          : sendLogs.filter(l => l.status === logFilter)
+
+        return (<>
+          {/* KPIs */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Card className="border-l-4 border-l-emerald-400">
+              <CardContent className="p-4">
+                <p className="text-2xl font-bold text-emerald-600">{totalSuccess}</p>
+                <p className="text-xs text-muted-foreground">Enviados com sucesso</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">{sendLogs.length > 0 ? ((totalSuccess / sendLogs.length) * 100).toFixed(1) : 0}% do total</p>
+              </CardContent>
+            </Card>
+            <Card className="border-l-4 border-l-cyan-400">
+              <CardContent className="p-4">
+                <p className="text-2xl font-bold text-cyan-600">{opened}</p>
+                <p className="text-xs text-muted-foreground">Abriram o email</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">{totalSuccess > 0 ? ((opened / totalSuccess) * 100).toFixed(1) : 0}% taxa de abertura</p>
+              </CardContent>
+            </Card>
+            <Card className="border-l-4 border-l-blue-400">
+              <CardContent className="p-4">
+                <p className="text-2xl font-bold text-blue-600">{clicked}</p>
+                <p className="text-xs text-muted-foreground">Clicaram no link</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">{totalSuccess > 0 ? ((clicked / totalSuccess) * 100).toFixed(1) : 0}% taxa de clique</p>
+              </CardContent>
+            </Card>
+            <Card className="border-l-4 border-l-red-400">
+              <CardContent className="p-4">
+                <p className="text-2xl font-bold text-red-600">{totalBounced + totalFailed}</p>
+                <p className="text-xs text-muted-foreground">Nao entregues</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">{totalBounced} bounces, {totalFailed} erros</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Logs */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-semibold">Detalhamento por Destinatario</CardTitle>
+                <span className="text-xs text-muted-foreground">{filteredLogs.length} registros</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {filterButtons.map(b => (
+                  <button key={b.key} onClick={() => setLogFilter(b.key)} className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${logFilter === b.key ? b.color + ' ring-2 ring-offset-1 ring-current' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}>
+                    {b.label} ({b.count})
+                  </button>
                 ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/30">
+                      <TableHead className="text-xs pl-4">Email</TableHead>
+                      <TableHead className="text-xs">Status</TableHead>
+                      <TableHead className="text-xs">Enviado</TableHead>
+                      <TableHead className="text-xs">Entregue</TableHead>
+                      <TableHead className="text-xs">Aberto</TableHead>
+                      <TableHead className="text-xs pr-4">Erro</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredLogs.slice(0, 200).map((log) => (
+                      <TableRow key={log.id}>
+                        <TableCell className="text-sm pl-4">{log.email}</TableCell>
+                        <TableCell>
+                          <Badge className={SEND_LOG_STATUS_COLORS[log.status] || 'bg-gray-100 text-gray-800'} variant="secondary">
+                            {SEND_LOG_STATUS_LABELS[log.status] || log.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{log.sent_at ? formatDate(log.sent_at) : '-'}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{log.delivered_at ? formatDate(log.delivered_at) : '-'}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{log.opened_at ? formatDate(log.opened_at) : '-'}</TableCell>
+                        <TableCell className="text-xs text-red-500 pr-4 max-w-[200px] truncate">{(log as any).error_message || '-'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {filteredLogs.length > 200 && (
+                <p className="text-xs text-muted-foreground text-center py-2">Mostrando 200 de {filteredLogs.length} registros</p>
+              )}
+            </CardContent>
+          </Card>
+        </>)
+      })()}
       )}
     </div>
   )
