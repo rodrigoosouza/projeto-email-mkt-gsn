@@ -65,6 +65,7 @@ const SEND_LOG_STATUS_LABELS: Record<string, string> = {
   opened: 'Aberto',
   clicked: 'Clicado',
   bounced: 'Bounce',
+  failed: 'Falhou',
   complained: 'Reclamacao',
 }
 
@@ -75,6 +76,7 @@ const SEND_LOG_STATUS_COLORS: Record<string, string> = {
   opened: 'bg-emerald-100 text-emerald-800',
   clicked: 'bg-cyan-100 text-cyan-800',
   bounced: 'bg-red-100 text-red-800',
+  failed: 'bg-amber-100 text-amber-800',
   complained: 'bg-orange-100 text-orange-800',
 }
 
@@ -133,8 +135,8 @@ export default function CampaignDetailPage() {
       setSendLogs(logs)
       // Calculate progress from logs
       if (logs.length > 0) {
-        const sent = logs.filter(l => l.status === 'sent' || l.status === 'delivered' || l.status === 'opened' || l.status === 'clicked').length
-        const failed = logs.filter(l => l.status === 'bounced' || l.status === 'complained').length
+        const sent = logs.filter(l => ['sent', 'delivered', 'opened', 'clicked'].includes(l.status)).length
+        const failed = logs.filter(l => ['bounced', 'complained', 'failed'].includes(l.status)).length
         const pending = logs.filter(l => l.status === 'pending').length
         setSendProgress({ sent, failed, pending, total: logs.length })
       }

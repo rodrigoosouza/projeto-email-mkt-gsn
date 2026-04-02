@@ -7,9 +7,10 @@ import { applyRulesToQuery } from '@/lib/supabase/segments'
 
 export const maxDuration = 300 // 5 min max (Vercel Pro)
 
-const BATCH_SIZE = 25
-const BATCH_DELAY_MS = 500
-const MAX_RETRIES = 2
+// Rate limit: 60 req/min = 1 per second. Send sequentially with 1.2s delay.
+const SEND_DELAY_MS = 1200
+const MAX_RETRIES = 3
+const RATE_LIMIT_WAIT_MS = 65000 // wait 65s when hitting 429
 
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -25,13 +26,22 @@ async function sendWithRetry(
       return { messageId: result.messageId }
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Erro desconhecido'
-      // Don't retry on 4xx (invalid email, auth error)
+      // Don't retry on 4xx (invalid email, auth error) — except 429
       if (msg.includes('422') || msg.includes('401') || msg.includes('403')) {
         return { messageId: null, error: msg }
       }
+      // Rate limited (429) — wait and retry
+      if (msg.includes('429')) {
+        if (attempt < retries) {
+          console.log(`[SendEmail] Rate limited, waiting ${RATE_LIMIT_WAIT_MS / 1000}s before retry ${attempt + 1}/${retries}`)
+          await delay(RATE_LIMIT_WAIT_MS)
+          continue
+        }
+        return { messageId: null, error: 'Rate limit excedido apos retentativas' }
+      }
       // Retry on 5xx or network errors
       if (attempt < retries) {
-        await delay(1000 * (attempt + 1)) // exponential backoff
+        await delay(2000 * (attempt + 1))
         continue
       }
       return { messageId: null, error: msg }
@@ -157,56 +167,46 @@ export async function POST(
       { onConflict: 'campaign_id' }
     )
 
-    // Send in batches
+    // Send sequentially — 1 email at a time with delay to respect rate limit (60 req/min)
     let sentCount = 0
     let errorCount = 0
 
-    for (let i = 0; i < leads.length; i += BATCH_SIZE) {
-      const batch = leads.slice(i, i + BATCH_SIZE)
+    for (let i = 0; i < leads.length; i++) {
+      const lead = leads[i]
+      const variables = buildLeadVariables(lead)
+      const personalizedSubject = replaceTemplateVariables(template.subject, variables)
+      const personalizedHtml = replaceTemplateVariables(template.html_content, variables)
 
-      const results = await Promise.allSettled(
-        batch.map(async (lead) => {
-          const variables = buildLeadVariables(lead)
-          const personalizedSubject = replaceTemplateVariables(template.subject, variables)
-          const personalizedHtml = replaceTemplateVariables(template.html_content, variables)
+      const { messageId, error } = await sendWithRetry({
+        from: { email: senderEmail, name: senderName },
+        to: [{ email: lead.email, name: variables.full_name }],
+        subject: personalizedSubject,
+        html: personalizedHtml,
+      })
 
-          const { messageId, error } = await sendWithRetry({
-            from: { email: senderEmail, name: senderName },
-            to: [{ email: lead.email, name: variables.full_name }],
-            subject: personalizedSubject,
-            html: personalizedHtml,
-          })
-
-          if (messageId) {
-            await admin.from('campaign_send_logs').update({
-              status: 'sent',
-              mailersend_message_id: messageId,
-              sent_at: new Date().toISOString(),
-            }).eq('campaign_id', campaignId).eq('lead_id', lead.id)
-            return { success: true }
-          } else {
-            await admin.from('campaign_send_logs').update({
-              status: 'bounced',
-              error_message: error || 'Falha no envio',
-            }).eq('campaign_id', campaignId).eq('lead_id', lead.id)
-            return { success: false, error }
-          }
-        })
-      )
-
-      for (const r of results) {
-        if (r.status === 'fulfilled' && r.value.success) sentCount++
-        else errorCount++
+      if (messageId) {
+        await admin.from('campaign_send_logs').update({
+          status: 'sent',
+          mailersend_message_id: messageId,
+          sent_at: new Date().toISOString(),
+        }).eq('campaign_id', campaignId).eq('lead_id', lead.id)
+        sentCount++
+      } else {
+        await admin.from('campaign_send_logs').update({
+          status: 'failed',
+          error_message: error || 'Falha no envio',
+        }).eq('campaign_id', campaignId).eq('lead_id', lead.id)
+        errorCount++
       }
 
-      // Delay between batches
-      if (i + BATCH_SIZE < leads.length) {
-        await delay(BATCH_DELAY_MS)
+      // Delay between sends to respect rate limit
+      if (i < leads.length - 1) {
+        await delay(SEND_DELAY_MS)
       }
 
-      // Log progress every 10 batches
-      if ((i / BATCH_SIZE) % 10 === 0 && i > 0) {
-        console.log(`[Campaign ${campaignId}] Progress: ${i + batch.length}/${leads.length} (${sentCount} sent, ${errorCount} errors)`)
+      // Log progress every 50 emails
+      if ((i + 1) % 50 === 0) {
+        console.log(`[Campaign ${campaignId}] Progress: ${i + 1}/${leads.length} (${sentCount} sent, ${errorCount} errors)`)
       }
     }
 
@@ -221,7 +221,6 @@ export async function POST(
     // Update stats with real counts
     await admin.from('campaign_stats').update({
       total_sent: sentCount,
-      total_bounced: errorCount,
     }).eq('campaign_id', campaignId)
 
     console.log(`[Campaign ${campaignId}] Done: ${sentCount} sent, ${errorCount} errors out of ${leads.length}`)
