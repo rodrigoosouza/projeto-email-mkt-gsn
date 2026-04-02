@@ -276,6 +276,34 @@ export default function CampaignDetailPage() {
     }
   }
 
+  const handleRetryFailed = async () => {
+    setSending(true)
+    try {
+      const response = await fetch(`/api/campaigns/${campaignId}/retry`, {
+        method: 'POST',
+      })
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Erro ao reenviar')
+      }
+      const data = await response.json()
+      toast({
+        title: 'Reenvio iniciado',
+        description: `Reenviando para ${data.totalRetry} destinatarios que falharam.`,
+      })
+      await fetchCampaign()
+      await Promise.all([fetchStats(), fetchSendLogs()])
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: error instanceof Error ? error.message : 'Nao foi possivel reenviar.',
+        variant: 'destructive',
+      })
+    } finally {
+      setSending(false)
+    }
+  }
+
   const handlePause = async () => {
     setPausing(true)
     try {
@@ -425,6 +453,19 @@ export default function CampaignDetailPage() {
             >
               <Pause className="mr-2 h-4 w-4" />
               {pausing ? 'Pausando...' : 'Pausar'}
+            </Button>
+          )}
+
+          {/* SENT/FAILED — retry failed */}
+          {(campaign.status === 'sent' || campaign.status === 'failed') && sendProgress && sendProgress.failed > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRetryFailed}
+              disabled={sending}
+            >
+              <Send className="mr-2 h-4 w-4" />
+              {sending ? 'Reenviando...' : `Reenviar ${sendProgress.failed} falhas`}
             </Button>
           )}
 
