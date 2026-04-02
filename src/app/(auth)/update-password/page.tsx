@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,8 +20,33 @@ export default function UpdatePasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [ready, setReady] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
+
+  // Exchange code for session when arriving from reset email
+  useEffect(() => {
+    const code = searchParams.get('code')
+    if (code) {
+      supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
+        if (error) {
+          setError('Link expirado ou invalido. Solicite um novo reset de senha.')
+        } else {
+          setReady(true)
+        }
+      })
+    } else {
+      // Check if already has a session (came from callback)
+      supabase.auth.getUser().then(({ data }) => {
+        if (data.user) {
+          setReady(true)
+        } else {
+          setError('Sessao expirada. Solicite um novo reset de senha.')
+        }
+      })
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -54,6 +79,17 @@ export default function UpdatePasswordPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (!ready && !error) {
+    return (
+      <Card>
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl font-bold">Verificando...</CardTitle>
+          <CardDescription>Validando seu link de redefinicao</CardDescription>
+        </CardHeader>
+      </Card>
+    )
   }
 
   return (
