@@ -86,52 +86,56 @@ async function syncPipedrive(
         pipelines.forEach((p: any) => pipelineMap.set(p.id, p.name))
       } catch { /* fallback to connection.pipeline_name below */ }
 
-      for (const deal of deals) {
-        const personEmail = extractPersonEmail(deal)
-        const personPhone = extractPersonPhone(deal)
-        const personName = extractPersonName(deal)
-        const orgName = extractOrgName(deal)
+      // Build all rows first
+      const rows = deals.map((deal: any) => ({
+        org_id: orgId,
+        deal_id: deal.id,
+        title: deal.title,
+        value: deal.value || 0,
+        currency: deal.currency || 'BRL',
+        status: deal.status,
+        stage_id: deal.stage_id,
+        stage_name: stageMap.get(deal.stage_id) || deal.stage_order_nr?.toString() || null,
+        pipeline_id: deal.pipeline_id,
+        pipeline_name: pipelineMap.get(deal.pipeline_id) || connection.pipeline_name || null,
+        person_id: deal.person_id?.value || deal.person_id || null,
+        person_name: extractPersonName(deal),
+        person_email: extractPersonEmail(deal),
+        person_phone: extractPersonPhone(deal),
+        org_name: extractOrgName(deal),
+        owner_name: deal.owner_name || deal.user_id?.name || null,
+        add_time: deal.add_time || null,
+        update_time: deal.update_time || null,
+        close_time: deal.close_time || null,
+        won_time: deal.won_time || null,
+        lost_time: deal.lost_time || null,
+        lost_reason: deal.lost_reason || null,
+        expected_close_date: deal.expected_close_date || null,
+        probability: deal.probability || null,
+        label: deal.label || null,
+        utm_source: deal['92f5fbfb2cfdcbe4d46a72b5acf06ca15f29ac14'] || deal['06754c74401e609e506d01d3a928f8d3025ad43e'] || null,
+        utm_medium: deal['15bdeb9558dc89ed77d92cbfa0d04a4ee26d4d1f'] || deal['a335961b5cded844362e09480b5ca68048e33404'] || null,
+        utm_campaign: deal['6b578f95362c28ee95473982525671ff43435b38'] || deal['6bc82d18de3ae4574c4f8b8185a1dfa7e43cd5d0'] || null,
+        utm_content: deal['921482eae8dae5a8b2c830100038a17801df8b45'] || deal['ba178b2651759509012cfad3beac506f51d12a27'] || null,
+        utm_term: deal['5c22fd65ac5f7dbfbef6c07347fde9154bcdc385'] || deal['3ba67d7950d346b4b6dd0d4bbb8974a007a53aee'] || null,
+        fbclid: deal['143f49947826ce1d1b3e995baa842e96de518e74'] || null,
+        raw_data: deal,
+        synced_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }))
 
-        await admin
+      // Batch upsert in chunks of 500
+      const BATCH_SIZE = 500
+      for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+        const batch = rows.slice(i, i + BATCH_SIZE)
+        const { error } = await admin
           .from('pipedrive_deals')
-          .upsert({
-            org_id: orgId,
-            deal_id: deal.id,
-            title: deal.title,
-            value: deal.value || 0,
-            currency: deal.currency || 'BRL',
-            status: deal.status, // open, won, lost, deleted
-            stage_id: deal.stage_id,
-            stage_name: stageMap.get(deal.stage_id) || deal.stage_order_nr?.toString() || null,
-            pipeline_id: deal.pipeline_id,
-            pipeline_name: pipelineMap.get(deal.pipeline_id) || connection.pipeline_name || null,
-            person_id: deal.person_id?.value || deal.person_id || null,
-            person_name: personName,
-            person_email: personEmail,
-            person_phone: personPhone,
-            org_name: orgName,
-            owner_name: deal.owner_name || deal.user_id?.name || null,
-            add_time: deal.add_time || null,
-            update_time: deal.update_time || null,
-            close_time: deal.close_time || null,
-            won_time: deal.won_time || null,
-            lost_time: deal.lost_time || null,
-            lost_reason: deal.lost_reason || null,
-            expected_close_date: deal.expected_close_date || null,
-            probability: deal.probability || null,
-            label: deal.label || null,
-            // UTM fields (Pipedrive custom field hashes)
-            utm_source: deal['92f5fbfb2cfdcbe4d46a72b5acf06ca15f29ac14'] || deal['06754c74401e609e506d01d3a928f8d3025ad43e'] || null,
-            utm_medium: deal['15bdeb9558dc89ed77d92cbfa0d04a4ee26d4d1f'] || deal['a335961b5cded844362e09480b5ca68048e33404'] || null,
-            utm_campaign: deal['6b578f95362c28ee95473982525671ff43435b38'] || deal['6bc82d18de3ae4574c4f8b8185a1dfa7e43cd5d0'] || null,
-            utm_content: deal['921482eae8dae5a8b2c830100038a17801df8b45'] || deal['ba178b2651759509012cfad3beac506f51d12a27'] || null,
-            utm_term: deal['5c22fd65ac5f7dbfbef6c07347fde9154bcdc385'] || deal['3ba67d7950d346b4b6dd0d4bbb8974a007a53aee'] || null,
-            fbclid: deal['143f49947826ce1d1b3e995baa842e96de518e74'] || null,
-            raw_data: deal,
-            synced_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          }, { onConflict: 'org_id,deal_id' })
-        totalSynced++
+          .upsert(batch, { onConflict: 'org_id,deal_id' })
+        if (error) {
+          console.error('[Pipedrive sync] Batch upsert error:', error.message)
+          throw error
+        }
+        totalSynced += batch.length
       }
     }
 
