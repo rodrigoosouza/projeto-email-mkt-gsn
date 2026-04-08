@@ -41,6 +41,7 @@ import {
   Brain,
   Radar,
   MapPin,
+  Radio,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -138,6 +139,7 @@ const navigationGroups: NavGroup[] = [
     label: 'Criativos',
     items: [
       { name: 'Videos', href: '/videos', icon: Video },
+      { name: 'Lives', href: '/lives', icon: Radio },
     ],
   },
   {
