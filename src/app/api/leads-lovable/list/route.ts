@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
   const orgId = searchParams.get('orgId')
   const from = searchParams.get('from') // YYYY-MM-DD
   const to = searchParams.get('to')
+  const metaOnly = searchParams.get('metaOnly') === '1'
   const limit = Math.min(parseInt(searchParams.get('limit') || '500', 10), 2000)
 
   if (!orgId) return NextResponse.json({ error: 'orgId required' }, { status: 400 })
@@ -27,6 +28,9 @@ export async function GET(request: NextRequest) {
   // Filtra pelo created_at do Lovable (data_correta vem null em alguns leads)
   if (from) leadsQuery = leadsQuery.gte('created_at', `${from}T00:00:00Z`)
   if (to) leadsQuery = leadsQuery.lte('created_at', `${to}T23:59:59Z`)
+
+  // Só leads atribuídos ao Meta (fbclid presente)
+  if (metaOnly) leadsQuery = leadsQuery.not('fbclid', 'is', null)
 
   const { data: leads, error: leadsError } = await leadsQuery
   if (leadsError) return NextResponse.json({ error: leadsError.message }, { status: 500 })

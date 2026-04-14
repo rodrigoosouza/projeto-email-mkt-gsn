@@ -110,13 +110,15 @@ export default function LeadsLovablePage() {
 
   const [{ from, to }, setRange] = useState(last7Days())
   const [search, setSearch] = useState('')
+  const [metaOnly, setMetaOnly] = useState(false)
 
   async function load() {
     if (!currentOrg) return
     setLoading(true)
     setError(null)
     try {
-      const params = new URLSearchParams({ orgId: currentOrg.id, from, to, limit: '1000' })
+      const params = new URLSearchParams({ orgId: currentOrg.id, from, to, limit: '2000' })
+      if (metaOnly) params.set('metaOnly', '1')
       const res = await fetch(`/api/leads-lovable/list?${params}`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Erro ao carregar')
@@ -130,7 +132,7 @@ export default function LeadsLovablePage() {
     }
   }
 
-  useEffect(() => { load() }, [currentOrg?.id, from, to]) // eslint-disable-line
+  useEffect(() => { load() }, [currentOrg?.id, from, to, metaOnly]) // eslint-disable-line
 
   const filtered = useMemo(() => {
     if (!search) return leads
@@ -193,6 +195,18 @@ export default function LeadsLovablePage() {
           <div className="space-y-1 flex-1 min-w-[200px]">
             <label className="text-xs text-muted-foreground">Buscar</label>
             <Input placeholder="email, empresa, utm..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Canal</label>
+            <Button
+              type="button"
+              variant={metaOnly ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setMetaOnly((v) => !v)}
+              className="h-10"
+            >
+              {metaOnly ? '✓ Só Meta (fbclid)' : 'Só canal Meta'}
+            </Button>
           </div>
         </CardContent>
       </Card>
