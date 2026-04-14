@@ -24,8 +24,9 @@ export async function GET(request: NextRequest) {
     .order('created_at', { ascending: false, nullsFirst: false })
     .limit(limit)
 
-  if (from) leadsQuery = leadsQuery.gte('data_correta', from)
-  if (to) leadsQuery = leadsQuery.lte('data_correta', to)
+  // Filtra pelo created_at do Lovable (data_correta vem null em alguns leads)
+  if (from) leadsQuery = leadsQuery.gte('created_at', `${from}T00:00:00Z`)
+  if (to) leadsQuery = leadsQuery.lte('created_at', `${to}T23:59:59Z`)
 
   const { data: leads, error: leadsError } = await leadsQuery
   if (leadsError) return NextResponse.json({ error: leadsError.message }, { status: 500 })
@@ -62,7 +63,7 @@ export async function GET(request: NextRequest) {
 
   const comparison = Object.entries(byDay)
     .map(([date, v]) => ({ date, ...v, diff: v.lovable_leads - v.meta_leads }))
-    .sort((a, b) => b.date.localeCompare(a.date))
+    .sort((a, b) => a.date.localeCompare(b.date))
 
   return NextResponse.json({
     leads: leads || [],
