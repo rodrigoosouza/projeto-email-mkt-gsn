@@ -46,15 +46,17 @@ export async function GET(request: NextRequest) {
 
   const { data: metaRows } = await metaQuery
 
-  // Pipedrive deals no mesmo período (filtra por fbclid se metaOnly)
+  // Pipedrive deals no mesmo período
+  // Critério Meta-only = utm_source contém 'facebook' (mesmo do report Pipedrive),
+  // pois fbclid não é populado na sincronia atual
   let pipeQuery = supabase
     .from('pipedrive_deals')
-    .select('add_time, fbclid')
+    .select('add_time, utm_source, fbclid')
     .eq('org_id', orgId)
 
   if (from) pipeQuery = pipeQuery.gte('add_time', `${from}T00:00:00Z`)
   if (to) pipeQuery = pipeQuery.lte('add_time', `${to}T23:59:59Z`)
-  if (metaOnly) pipeQuery = pipeQuery.not('fbclid', 'is', null)
+  if (metaOnly) pipeQuery = pipeQuery.ilike('utm_source', '%facebook%')
 
   const { data: pipeRows } = await pipeQuery
 
