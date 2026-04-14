@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -16,6 +16,20 @@ import {
 } from '@/components/ui/card'
 
 export default function UpdatePasswordPage() {
+  return (
+    <Suspense fallback={
+      <Card>
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl font-bold">Carregando...</CardTitle>
+        </CardHeader>
+      </Card>
+    }>
+      <UpdatePasswordForm />
+    </Suspense>
+  )
+}
+
+function UpdatePasswordForm() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState<string | null>(null)

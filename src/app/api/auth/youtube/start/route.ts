@@ -3,8 +3,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { buildYouTubeAuthUrl } from '@/lib/youtube/client'
 import { createClient } from '@/lib/supabase/server'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(req: NextRequest) {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: auth } = await supabase.auth.getUser()
   if (!auth.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
