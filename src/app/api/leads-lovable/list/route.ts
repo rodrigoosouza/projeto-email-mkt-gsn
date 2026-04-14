@@ -46,12 +46,34 @@ export async function GET(request: NextRequest) {
 
   const { data: metaRows } = await metaQuery
 
+  // Pipedrive deals no mesmo período (filtra por fbclid se metaOnly)
+  let pipeQuery = supabase
+    .from('pipedrive_deals')
+    .select('add_time, fbclid')
+    .eq('org_id', orgId)
+
+  if (from) pipeQuery = pipeQuery.gte('add_time', `${from}T00:00:00Z`)
+  if (to) pipeQuery = pipeQuery.lte('add_time', `${to}T23:59:59Z`)
+  if (metaOnly) pipeQuery = pipeQuery.not('fbclid', 'is', null)
+
+  const { data: pipeRows } = await pipeQuery
+
   // Agrega por dia
-  const byDay: Record<string, { meta_leads: number; spend: number; impressions: number; clicks: number; lovable_leads: number }> = {}
+  type DayRow = {
+    meta_leads: number
+    spend: number
+    impressions: number
+    clicks: number
+    lovable_leads: number
+    lovable_to_pipe: number
+    pipedrive_deals: number
+  }
+  const empty = (): DayRow => ({ meta_leads: 0, spend: 0, impressions: 0, clicks: 0, lovable_leads: 0, lovable_to_pipe: 0, pipedrive_deals: 0 })
+  const byDay: Record<string, DayRow> = {}
 
   for (const row of metaRows || []) {
     const d = row.date
-    if (!byDay[d]) byDay[d] = { meta_leads: 0, spend: 0, impressions: 0, clicks: 0, lovable_leads: 0 }
+    if (!byDay[d]) byDay[d] = empty()
     byDay[d].meta_leads += row.leads || 0
     byDay[d].spend += Number(row.spend) || 0
     byDay[d].impressions += row.impressions || 0
@@ -61,12 +83,25 @@ export async function GET(request: NextRequest) {
   for (const lead of leads || []) {
     const d = lead.data_correta || (lead.created_at ? String(lead.created_at).slice(0, 10) : null)
     if (!d) continue
-    if (!byDay[d]) byDay[d] = { meta_leads: 0, spend: 0, impressions: 0, clicks: 0, lovable_leads: 0 }
+    if (!byDay[d]) byDay[d] = empty()
     byDay[d].lovable_leads += 1
+    if (lead.pipedrive_deal_id) byDay[d].lovable_to_pipe += 1
+  }
+
+  for (const deal of pipeRows || []) {
+    if (!deal.add_time) continue
+    const d = String(deal.add_time).slice(0, 10)
+    if (!byDay[d]) byDay[d] = empty()
+    byDay[d].pipedrive_deals += 1
   }
 
   const comparison = Object.entries(byDay)
-    .map(([date, v]) => ({ date, ...v, diff: v.lovable_leads - v.meta_leads }))
+    .map(([date, v]) => ({
+      date,
+      ...v,
+      diff: v.lovable_leads - v.meta_leads,
+      diff_pipe: v.pipedrive_deals - v.lovable_leads,
+    }))
     .sort((a, b) => a.date.localeCompare(b.date))
 
   return NextResponse.json({
@@ -75,6 +110,8 @@ export async function GET(request: NextRequest) {
     totals: {
       lovable: (leads || []).length,
       meta: (metaRows || []).reduce((s, r) => s + (r.leads || 0), 0),
+      pipedrive: (pipeRows || []).length,
+      lovable_to_pipe: (leads || []).filter((l) => l.pipedrive_deal_id).length,
     },
   })
 }

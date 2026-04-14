@@ -14,7 +14,10 @@ type ComparisonRow = {
   date: string
   meta_leads: number
   lovable_leads: number
+  pipedrive_deals: number
+  lovable_to_pipe: number
   diff: number
+  diff_pipe: number
   spend: number
   impressions: number
   clicks: number
@@ -104,7 +107,7 @@ export default function LeadsLovablePage() {
   const { currentOrg } = useOrganizationContext()
   const [leads, setLeads] = useState<Lead[]>([])
   const [comparison, setComparison] = useState<ComparisonRow[]>([])
-  const [totals, setTotals] = useState({ lovable: 0, meta: 0 })
+  const [totals, setTotals] = useState({ lovable: 0, meta: 0, pipedrive: 0, lovable_to_pipe: 0 })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -124,7 +127,7 @@ export default function LeadsLovablePage() {
       if (!res.ok) throw new Error(data.error || 'Erro ao carregar')
       setLeads(data.leads || [])
       setComparison(data.comparison || [])
-      setTotals(data.totals || { lovable: 0, meta: 0 })
+      setTotals(data.totals || { lovable: 0, meta: 0, pipedrive: 0, lovable_to_pipe: 0 })
     } catch (e: any) {
       setError(e.message)
     } finally {
@@ -218,17 +221,27 @@ export default function LeadsLovablePage() {
       )}
 
       {/* Totais */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Leads Lovable</CardTitle></CardHeader>
-          <CardContent><div className="text-3xl font-bold">{totals.lovable}</div></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Leads Meta Ads</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Meta Ads</CardTitle></CardHeader>
           <CardContent><div className="text-3xl font-bold">{totals.meta}</div></CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Diferença</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Lovable</CardTitle></CardHeader>
+          <CardContent><div className="text-3xl font-bold">{totals.lovable}</div></CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Pipedrive (deals)</CardTitle></CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{totals.pipedrive}</div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Lovable → Pipe: {totals.lovable_to_pipe}/{totals.lovable}
+              {totals.lovable > 0 && ` (${Math.round((totals.lovable_to_pipe / totals.lovable) * 100)}%)`}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Δ Lovable - Meta</CardTitle></CardHeader>
           <CardContent>
             <div className={`text-3xl font-bold ${totals.lovable - totals.meta >= 0 ? 'text-green-600' : 'text-red-600'}`}>
               {totals.lovable - totals.meta > 0 ? '+' : ''}{totals.lovable - totals.meta}
@@ -239,16 +252,19 @@ export default function LeadsLovablePage() {
 
       {/* Comparação por dia */}
       <Card>
-        <CardHeader><CardTitle>Comparação Meta Ads × Lovable por dia</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Comparação Meta Ads × Lovable × Pipedrive por dia</CardTitle></CardHeader>
         <CardContent>
           <div className="overflow-auto border rounded-md">
             <table className="w-full text-sm">
               <thead className="bg-muted">
                 <tr>
                   <th className="text-left p-2 font-medium">Dia</th>
-                  <th className="text-right p-2 font-medium">Meta (leads)</th>
-                  <th className="text-right p-2 font-medium">Lovable (leads)</th>
-                  <th className="text-right p-2 font-medium">Δ</th>
+                  <th className="text-right p-2 font-medium">Meta</th>
+                  <th className="text-right p-2 font-medium">Lovable</th>
+                  <th className="text-right p-2 font-medium">Pipedrive</th>
+                  <th className="text-right p-2 font-medium">Lovable→Pipe</th>
+                  <th className="text-right p-2 font-medium">Δ Lov-Meta</th>
+                  <th className="text-right p-2 font-medium">Δ Pipe-Lov</th>
                   <th className="text-right p-2 font-medium">Spend</th>
                   <th className="text-right p-2 font-medium">Impressões</th>
                   <th className="text-right p-2 font-medium">Cliques</th>
@@ -256,16 +272,25 @@ export default function LeadsLovablePage() {
               </thead>
               <tbody>
                 {comparison.length === 0 && (
-                  <tr><td colSpan={7} className="text-center p-4 text-muted-foreground">Sem dados no período</td></tr>
+                  <tr><td colSpan={10} className="text-center p-4 text-muted-foreground">Sem dados no período</td></tr>
                 )}
                 {comparison.map((r) => (
                   <tr key={r.date} className="border-t">
                     <td className="p-2">{r.date}</td>
                     <td className="p-2 text-right">{r.meta_leads}</td>
                     <td className="p-2 text-right">{r.lovable_leads}</td>
+                    <td className="p-2 text-right">{r.pipedrive_deals}</td>
+                    <td className="p-2 text-right">
+                      <span className="text-muted-foreground">{r.lovable_to_pipe}/{r.lovable_leads}</span>
+                    </td>
                     <td className="p-2 text-right">
                       <Badge variant={r.diff === 0 ? 'secondary' : r.diff > 0 ? 'default' : 'destructive'}>
                         {r.diff > 0 ? '+' : ''}{r.diff}
+                      </Badge>
+                    </td>
+                    <td className="p-2 text-right">
+                      <Badge variant={r.diff_pipe === 0 ? 'secondary' : r.diff_pipe > 0 ? 'default' : 'destructive'}>
+                        {r.diff_pipe > 0 ? '+' : ''}{r.diff_pipe}
                       </Badge>
                     </td>
                     <td className="p-2 text-right">R$ {r.spend.toFixed(2)}</td>
