@@ -47,7 +47,7 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith(path)
   )
   const isApiWebhook = request.nextUrl.pathname.startsWith('/api/webhooks')
-  const isApiPublic = ['/api/forms/', '/api/tracking/', '/api/bio/', '/api/chatbot/', '/api/meta-ads/sync', '/api/pipedrive/sync', '/api/leads-lovable/ingest', '/api/share/'].some(
+  const isApiPublic = ['/api/forms/', '/api/tracking/', '/api/bio/', '/api/chatbot/', '/api/meta-ads/sync', '/api/pipedrive/sync', '/api/google-ads/sync', '/api/leads-lovable/ingest', '/api/share/'].some(
     (path) => request.nextUrl.pathname.startsWith(path)
   )
 

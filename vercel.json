@@ -5,8 +5,12 @@
       "schedule": "0 6 * * *"
     },
     {
-      "path": "/api/pipedrive/sync",
+      "path": "/api/pipedrive/sync-incremental?hours=26",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/google-ads/sync",
+      "schedule": "0 8 * * *"
     }
   ]
 }

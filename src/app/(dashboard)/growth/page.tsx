@@ -7,8 +7,10 @@ import {
   Eye, ArrowRight, Clock, CheckCircle2, RefreshCw,
   Image, Layers, Video, BarChart3, ArrowDown, Percent,
   Globe, Monitor, Smartphone, Tablet, MapPin, Zap, FileText,
-  Activity, Timer, Megaphone,
+  Activity, Timer, Megaphone, Share2, Copy, Check, ExternalLink, Trash2,
 } from 'lucide-react'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -125,6 +127,37 @@ export default function GrowthAnalysisPage() {
   const [ga4Data, setGa4Data] = useState<any>(null)
   const [ga4Loading, setGa4Loading] = useState(false)
   const [ga4Error, setGa4Error] = useState<string | null>(null)
+
+  // Share dialog
+  const [shareOpen, setShareOpen] = useState(false)
+  const [shares, setShares] = useState<any[]>([])
+  const [creatingShare, setCreatingShare] = useState(false)
+  const [shareTitle, setShareTitle] = useState('')
+  const [copied, setCopied] = useState<string | null>(null)
+  const loadShares = async () => {
+    if (!orgId) return
+    const r = await fetch(`/api/dashboards/share?orgId=${orgId}`)
+    if (r.ok) { const all = await r.json(); setShares(all.filter((s: any) => s.dashboard_type === 'growth')) }
+  }
+  const openShare = async () => { setShareOpen(true); await loadShares() }
+  const createShare = async () => {
+    if (!orgId) return; setCreatingShare(true)
+    try {
+      const r = await fetch('/api/dashboards/share', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orgId, dashboardType: 'growth', title: shareTitle || `Análise MKT/Vendas — ${currentOrg?.name}` }),
+      })
+      if (r.ok) { setShareTitle(''); await loadShares() }
+    } finally { setCreatingShare(false) }
+  }
+  const revokeShare = async (id: string) => {
+    if (!confirm('Revogar este link?')) return
+    await fetch(`/api/dashboards/share?id=${id}`, { method: 'DELETE' })
+    await loadShares()
+  }
+  const copyShare = async (url: string, id: string) => {
+    await navigator.clipboard.writeText(url); setCopied(id); setTimeout(() => setCopied(null), 2000)
+  }
 
   const loadData = useCallback(async () => {
     if (!orgId) { setLoading(false); return }
@@ -425,12 +458,68 @@ export default function GrowthAnalysisPage() {
               <SelectItem value="all">Todo periodo</SelectItem>
             </SelectContent>
           </Select>
+          <Button size="sm" onClick={openShare} variant="outline">
+            <Share2 className="mr-2 h-3.5 w-3.5" /> Compartilhar
+          </Button>
           <Button size="sm" onClick={handleSync} disabled={syncing} variant="outline">
             <RefreshCw className={cn('mr-2 h-3.5 w-3.5', syncing && 'animate-spin')} />
             {syncing ? 'Sincronizando...' : 'Sincronizar'}
           </Button>
         </div>
       </div>
+
+      <Dialog open={shareOpen} onOpenChange={setShareOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Compartilhar Análise MKT e Vendas</DialogTitle>
+            <DialogDescription>
+              Link público com funil + KPIs principais (sem dados sensíveis tipo nomes de leads). Quem tiver o link vê os números sem fazer login.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="flex gap-2">
+              <Input placeholder={`Ex: Análise CEO ${currentOrg?.name}`} value={shareTitle} onChange={(e) => setShareTitle(e.target.value)} />
+              <Button onClick={createShare} disabled={creatingShare}>
+                {creatingShare ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Gerar link'}
+              </Button>
+            </div>
+            <div className="space-y-2 max-h-[400px] overflow-y-auto">
+              {shares.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">Nenhum link criado ainda</p>}
+              {shares.map((s: any) => (
+                <div key={s.id} className={`border rounded-lg p-3 space-y-2 ${!s.is_active && 'opacity-50'}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{s.title || 'Sem título'}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {s.view_count} visualizaç{s.view_count === 1 ? 'ão' : 'ões'}
+                        {s.last_viewed_at && ` · última em ${new Date(s.last_viewed_at).toLocaleString('pt-BR')}`}
+                        {!s.is_active && ' · REVOGADO'}
+                      </p>
+                    </div>
+                    {s.is_active && (
+                      <Button variant="ghost" size="sm" onClick={() => revokeShare(s.id)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    )}
+                  </div>
+                  {s.is_active && (
+                    <div className="flex items-center gap-1.5">
+                      <Input value={s.url} readOnly className="text-xs h-8 font-mono" />
+                      <Button variant="outline" size="sm" onClick={() => copyShare(s.url, s.id)} className="h-8 px-2">
+                        {copied === s.id ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
+                      </Button>
+                      <a href={s.url} target="_blank" rel="noreferrer">
+                        <Button variant="outline" size="sm" className="h-8 px-2"><ExternalLink className="h-3.5 w-3.5" /></Button>
+                      </a>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => setShareOpen(false)}>Fechar</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* GROWTH FUNNEL */}
       <Card className="border-0 shadow-md bg-gradient-to-br from-card to-muted/20">
