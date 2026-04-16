@@ -39,6 +39,7 @@ async function syncAccount(
     customer_id: account.customer_id,
     developer_token: developerToken,
     access_token: accessToken,
+    login_customer_id: account.login_customer_id || undefined,
   }
 
   // Create sync log

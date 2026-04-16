@@ -115,6 +115,7 @@ const navigationGroups: NavGroup[] = [
     label: 'Trafego Pago',
     items: [
       { name: 'Dashboard Meta Ads', href: '/ads/dashboard', icon: BarChart3 },
+      { name: 'Dashboard Google Ads', href: '/ads/google-dashboard', icon: BarChart3 },
       { name: 'CRM Funil', href: '/pipedrive', icon: Handshake },
       { name: 'Analise MKT e Vendas', href: '/growth', icon: TrendingUp },
       { name: 'Leads Lovable', href: '/leads-lovable', icon: Table },

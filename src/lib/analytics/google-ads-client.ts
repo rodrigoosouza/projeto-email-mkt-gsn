@@ -8,6 +8,7 @@ export interface GoogleAdsConfig {
   customer_id: string // format: 123-456-7890 (dashes stripped in API calls)
   developer_token: string
   access_token: string
+  login_customer_id?: string // MCC ID quando a conta é gerenciada por uma manager account
 }
 
 interface CreateCampaignParams {
@@ -103,11 +104,15 @@ function stripDashes(customerId: string): string {
 }
 
 function buildHeaders(config: GoogleAdsConfig): Record<string, string> {
-  return {
+  const h: Record<string, string> = {
     'Authorization': `Bearer ${config.access_token}`,
     'developer-token': config.developer_token,
     'Content-Type': 'application/json',
   }
+  if (config.login_customer_id) {
+    h['login-customer-id'] = stripDashes(config.login_customer_id)
+  }
+  return h
 }
 
 async function googleAdsPost(
