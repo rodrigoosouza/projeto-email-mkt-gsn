@@ -12,7 +12,8 @@ export async function GET(request: NextRequest) {
   const orgId = searchParams.get('orgId')
   const from = searchParams.get('from') // YYYY-MM-DD
   const to = searchParams.get('to')
-  const metaOnly = searchParams.get('metaOnly') === '1'
+  const channel = searchParams.get('channel') || 'all'  // all | meta | google | organico
+  const metaOnly = searchParams.get('metaOnly') === '1' || channel === 'meta'  // back-compat
   const limit = Math.min(parseInt(searchParams.get('limit') || '500', 10), 2000)
 
   if (!orgId) return NextResponse.json({ error: 'orgId required' }, { status: 400 })
@@ -29,8 +30,14 @@ export async function GET(request: NextRequest) {
   if (from) leadsQuery = leadsQuery.gte('created_at', `${from}T00:00:00Z`)
   if (to) leadsQuery = leadsQuery.lte('created_at', `${to}T23:59:59Z`)
 
-  // Só leads atribuídos ao Meta (fbclid presente)
-  if (metaOnly) leadsQuery = leadsQuery.not('fbclid', 'is', null)
+  // Filtra leads pelo canal
+  if (channel === 'meta' || metaOnly) {
+    leadsQuery = leadsQuery.not('fbclid', 'is', null)
+  } else if (channel === 'google') {
+    leadsQuery = leadsQuery.or('gclid.not.is.null,gad_source.not.is.null')
+  } else if (channel === 'organico') {
+    leadsQuery = leadsQuery.is('fbclid', null).is('gclid', null).is('gad_source', null)
+  }
 
   const { data: leads, error: leadsError } = await leadsQuery
   if (leadsError) return NextResponse.json({ error: leadsError.message }, { status: 500 })
@@ -56,7 +63,9 @@ export async function GET(request: NextRequest) {
 
   if (from) pipeQuery = pipeQuery.gte('add_time', `${from}T00:00:00Z`)
   if (to) pipeQuery = pipeQuery.lte('add_time', `${to}T23:59:59Z`)
-  if (metaOnly) pipeQuery = pipeQuery.ilike('utm_source', '%facebook%')
+  if (channel === 'meta' || metaOnly) pipeQuery = pipeQuery.ilike('utm_source', '%facebook%')
+  else if (channel === 'google') pipeQuery = pipeQuery.ilike('utm_source', '%google%')
+  else if (channel === 'organico') pipeQuery = pipeQuery.is('utm_source', null)
 
   const { data: pipeRows } = await pipeQuery
 

@@ -113,7 +113,7 @@ export default function LeadsLovablePage() {
 
   const [{ from, to }, setRange] = useState(last7Days())
   const [search, setSearch] = useState('')
-  const [metaOnly, setMetaOnly] = useState(false)
+  const [channel, setChannel] = useState<'all' | 'meta' | 'google' | 'organico'>('all')
 
   async function load() {
     if (!currentOrg) return
@@ -121,7 +121,7 @@ export default function LeadsLovablePage() {
     setError(null)
     try {
       const params = new URLSearchParams({ orgId: currentOrg.id, from, to, limit: '2000' })
-      if (metaOnly) params.set('metaOnly', '1')
+      if (channel !== 'all') params.set('channel', channel)
       const res = await fetch(`/api/leads-lovable/list?${params}`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Erro ao carregar')
@@ -135,7 +135,7 @@ export default function LeadsLovablePage() {
     }
   }
 
-  useEffect(() => { load() }, [currentOrg?.id, from, to, metaOnly]) // eslint-disable-line
+  useEffect(() => { load() }, [currentOrg?.id, from, to, channel]) // eslint-disable-line
 
   const filtered = useMemo(() => {
     if (!search) return leads
@@ -201,15 +201,20 @@ export default function LeadsLovablePage() {
           </div>
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Canal</label>
-            <Button
-              type="button"
-              variant={metaOnly ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setMetaOnly((v) => !v)}
-              className="h-10"
-            >
-              {metaOnly ? '✓ Só Meta (fbclid)' : 'Só canal Meta'}
-            </Button>
+            <div className="flex gap-1">
+              {(['all', 'meta', 'google', 'organico'] as const).map((c) => (
+                <Button
+                  key={c}
+                  type="button"
+                  variant={channel === c ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setChannel(c)}
+                  className="h-10"
+                >
+                  {c === 'all' ? 'Todos' : c === 'meta' ? 'Meta' : c === 'google' ? 'Google' : 'Orgânico'}
+                </Button>
+              ))}
+            </div>
           </div>
         </CardContent>
       </Card>
