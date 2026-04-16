@@ -42,12 +42,12 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   // Public paths that don't require auth
-  const publicPaths = ['/login', '/register', '/magic-link', '/reset-password', '/update-password', '/auth/callback', '/f/', '/b/']
+  const publicPaths = ['/login', '/register', '/magic-link', '/reset-password', '/update-password', '/auth/callback', '/f/', '/b/', '/share/']
   const isPublicPath = publicPaths.some((path) =>
     request.nextUrl.pathname.startsWith(path)
   )
   const isApiWebhook = request.nextUrl.pathname.startsWith('/api/webhooks')
-  const isApiPublic = ['/api/forms/', '/api/tracking/', '/api/bio/', '/api/chatbot/', '/api/meta-ads/sync', '/api/pipedrive/sync', '/api/leads-lovable/ingest'].some(
+  const isApiPublic = ['/api/forms/', '/api/tracking/', '/api/bio/', '/api/chatbot/', '/api/meta-ads/sync', '/api/pipedrive/sync', '/api/leads-lovable/ingest', '/api/share/'].some(
     (path) => request.nextUrl.pathname.startsWith(path)
   )
 
@@ -58,7 +58,8 @@ export async function updateSession(request: NextRequest) {
   }
 
   const isUpdatePassword = request.nextUrl.pathname.startsWith('/update-password')
-  if (user && isPublicPath && !isUpdatePassword) {
+  const isShare = request.nextUrl.pathname.startsWith('/share/')
+  if (user && isPublicPath && !isUpdatePassword && !isShare) {
     const url = request.nextUrl.clone()
     url.pathname = '/'
     return NextResponse.redirect(url)
