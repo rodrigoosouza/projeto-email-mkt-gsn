@@ -180,7 +180,7 @@ export default function GrowthAnalysisPage() {
       const [c, ai, asi, am, asm, d, s] = await Promise.all([
         sb.from('meta_campaign_insights').select('id,campaign_id,campaign_name,date,impressions,reach,clicks,link_clicks,spend,cpc,cpm,ctr,leads,cost_per_lead,frequency').eq('org_id', orgId).order('date', { ascending: false }).range(0, 999),
         sb.from('meta_ad_insights').select('id,ad_id,date,impressions,reach,clicks,link_clicks,spend,cpc,cpm,ctr,conversions,leads,actions').eq('org_id', orgId).range(0, 999),
-        sb.from('meta_adset_insights').select('id,adset_id,date,impressions,reach,clicks,link_clicks,spend,cpc,cpm,ctr,leads').eq('org_id', orgId).range(0, 999),
+        sb.from('meta_adset_insights').select('id,adset_id,adset_name,date,impressions,reach,clicks,link_clicks,spend,cpc,cpm,ctr,leads').eq('org_id', orgId).range(0, 999),
         sb.from('meta_ads').select('id,ad_id,adset_id,campaign_id,name,status,image_url,headline').eq('org_id', orgId).range(0, 999),
         sb.from('meta_adsets').select('id,adset_id,campaign_id,name,status,targeting').eq('org_id', orgId).range(0, 999),
         dealsPromise,
@@ -317,7 +317,7 @@ export default function GrowthAnalysisPage() {
   const topAudiences = useMemo(() => {
     const map = new Map()
     fAdsets.forEach(row => {
-      const meta = adsetMetaMap.get(row.adset_id), name = meta?.name || row.adset_id
+      const meta = adsetMetaMap.get(row.adset_id), name = meta?.name || row.adset_name || row.adset_id
       const e = map.get(name) || { name, spend: 0, imp: 0, clicks: 0, leads: 0 }
       e.spend += Number(row.spend); e.imp += Number(row.impressions); e.clicks += Number(row.clicks); e.leads += Number(row.leads)
       map.set(name, e)

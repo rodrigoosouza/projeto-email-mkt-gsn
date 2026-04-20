@@ -182,6 +182,7 @@ async function syncAccount(
           .upsert({
             org_id: orgId,
             adset_id: row.adset_id,
+            adset_name: row.adset_name || null,
             date: row.date_start,
             impressions: parseInt(row.impressions || '0', 10),
             reach: parseInt(row.reach || '0', 10),
